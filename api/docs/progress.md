@@ -27,17 +27,33 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - `drizzle-kit generate` sin cambios (esquema y migración coinciden).
 - Con un script temporal contra Postgres real: registro crea `buyer` con `emailVerified=false`; correo duplicado rechazado; enviar `role: seller` en el registro se ignora; login devuelve token de sesión; datos de prueba borrados.
 
+### Fase 2: registro, verificación y login por correo
+- Endpoints de Better Auth montados en `/api/v1/auth/*` (antes de `express.json()` en `src/app.js`): `sign-up/email`, `sign-in/email`, `email-otp/send-verification-otp`, `email-otp/verify-email`, `sign-in/email-otp`, entre otros.
+- Plugin `emailOTP`: código de 6 dígitos, caduca a los 10 min, 3 intentos, guardado con hash; el envío no se espera (evita diferencias de tiempo).
+- Registro con contraseña: inicia sesión de inmediato (devuelve `token`) y envía un código de verificación. La verificación es opcional: el login con contraseña no la exige. Registrar un correo ya existente responde 422 (`USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL`).
+- Login con código de un solo uso (también registra a un correo nuevo, ver notas).
+- Reenvío: pedir un código nuevo invalida el anterior.
+- Rate limiting de Better Auth activo en todos los entornos: 5/min en sign-up, sign-in, sign-in con código y verify-email; 3/min al pedir código (por IP).
+- Correo: `src/mail/index.js`, transport de consola (desarrollo y tests; imprime el código y lo guarda en `outbox`) y Resend en producción (`RESEND_API_KEY`, `MAIL_FROM`).
+- `test/auth.test.js` (8 pruebas HTTP con supertest contra Postgres real). El script `npm test` ahora fija `NODE_ENV=test`.
+- Verificación manual con `curl` contra el servidor en marcha: registro solo con código, y cuenta sin verificar + login con código.
+
 ## No hecho
 
-- Los endpoints HTTP de auth (`/api/v1/auth/*`) **no están montados** en `app.js`: Better Auth solo está configurado y probado llamando a su API directamente. La verificación anterior no cubre HTTP.
-- Fase 2: envío de código por correo (plugin `emailOTP`), verificación obligatoria de email, login con código, reenvío con límite de frecuencia y rate limiting. Hoy el registro no envía ni exige nada.
-- Transport de correo (consola en desarrollo, Resend en producción).
+- Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
+- Recuperación de contraseña (los endpoints existen en el plugin pero no están probados ni se envía un correo específico).
+- Almacén de rate limit compartido: hoy es en memoria (se reinicia con el servidor y no sirve con varias instancias).
+- Detrás de un proxy hay que configurar `advanced.ipAddress` (cabeceras de confianza); si no, el límite por IP puede falsearse con `X-Forwarded-For`.
 - Fase 3: plugin `bearer` para la sesión móvil, `requireAuth`, `requireRole`, `GET /api/v1/auth/me`.
-- Fase 4: login con Google por ID token y la vinculación de cuentas por email verificado (las reglas de vinculación de Better Auth no se han revisado).
 - Fase 5: tabla `stores` y `POST /api/v1/stores` (el usuario pasa a `seller`).
 - Pagos, pedidos, frontend/app móvil y despliegue quedan fuera de alcance.
 
 ## Notas y desviaciones
+
+- Simplificación pedida: el inicio de sesión queda en contraseña + código por correo. Verificación de email opcional (antes obligatoria) y login con Google fuera del plan (puede añadirse después sin cambiar el modelo).
+
+- **Limitación conocida (más probable ahora que la verificación es opcional):** iniciar sesión con código sobre una cuenta de contraseña **sin verificar** la verifica pero le borra la contraseña y revoca sus sesiones (comportamiento documentado de Better Auth contra el robo de cuentas). Después, el login con contraseña da 401 hasta restablecerla.
+- Iniciar sesión con código con un correo nuevo crea el usuario ya verificado con `name` vacío; falta decidir si se permite (hoy sí) o se pide nombre.
 
 - Sesión móvil: se usará el token de sesión opaco y revocable de Better Auth (plugin `bearer`), **no** JWT de acceso + refresh rotativo como se pensó al inicio; Better Auth no ofrece refresh rotativo.
 - `@better-auth/cli` está obsoleto; se usó `auth@latest generate`.

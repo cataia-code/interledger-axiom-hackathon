@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom API: uso y definición</title>
+<style>
+  :root {
+    --bg: #fafaf8; --surface: #ffffff; --text: #1c1c1a; --muted: #5f5f5a; --border: #e3e2dc;
+    --accent: #2457d6; --code-bg: #f1f0ea; --ok: #1a7f4b; --warn: #a35a00; --err: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514; --surface: #1d1d1b; --text: #ecebe6; --muted: #a3a29b; --border: #33322e;
+      --accent: #7aa2ff; --code-bg: #262624; --ok: #5fd08f; --warn: #f0b35a; --err: #ff8a80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151514; --surface: #1d1d1b; --text: #ecebe6; --muted: #a3a29b; --border: #33322e;
+    --accent: #7aa2ff; --code-bg: #262624; --ok: #5fd08f; --warn: #f0b35a; --err: #ff8a80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  h2 { font-size: 1.3rem; margin: 44px 0 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 16px 0 8px; font-size: .92rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86rem; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); }
+  pre code { background: none; padding: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .ep { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .m { font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 5px; color: #fff; }
+  .get { background: #1a7f4b; } .post { background: #2457d6; }
+  .path { font-family: ui-monospace, Menlo, monospace; font-size: .92rem; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 8px 0; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .pill { font-size: .75rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+  .flow { display: grid; gap: 8px; margin: 12px 0; counter-reset: s; }
+  .flow div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 10px 44px; position: relative; }
+  .flow div::before { counter-increment: s; content: counter(s); position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: .8rem; font-weight: 700; display: grid; place-items: center; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 12px; background: var(--surface); border-radius: 0 8px 8px 0; margin: 12px 0; font-size: .92rem; }
+  .tag { display: inline-block; margin: 2px 6px 2px 0; }
+  footer { margin-top: 48px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Axiom API</h1>
+<p class="sub">Estado actual de la API REST (fases 1 y 2, login simplificado a contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
+<nav>
+  <a href="#resumen">Resumen</a><a href="#arranque">Arranque</a><a href="#general">Convenciones</a>
+  <a href="#endpoints">Endpoints</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
+  <a href="#limites">Rate limit</a><a href="#definicion">Cómo se define</a><a href="#pendiente">Pendiente</a>
+</nav>
+
+<h2 id="resumen">Resumen</h2>
+<div class="card">
+  <p>API en <strong>Node.js 24 + Express 5</strong> (JavaScript ESM), con <strong>PostgreSQL</strong> vía Drizzle y autenticación con <strong>Better Auth</strong> montada bajo <code>/api/v1/auth</code>.</p>
+  <p>
+    <span class="tag pill">Express 5</span><span class="tag pill">Better Auth 1.7</span><span class="tag pill">Drizzle ORM</span>
+    <span class="tag pill">PostgreSQL 17</span><span class="tag pill">node --test + supertest</span><span class="tag pill">ESLint</span>
+  </p>
+  <p>URL base local: <code>http://localhost:3000/api/v1</code>. Todas las respuestas son JSON.</p>
+</div>
+
+<h2 id="arranque">Arranque local</h2>
+<pre><code>cd api
+cp .env.example .env     # ajusta BETTER_AUTH_SECRET (32+ caracteres aleatorios)
+npm install
+npm run db:up            # Postgres en Docker (puerto 5432)
+npm run db:migrate       # crea las tablas
+npm run dev              # servidor con recarga en :3000
+npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
+<table>
+  <tr><th>Variable</th><th>Uso</th><th>Por defecto</th></tr>
+  <tr><td><code>PORT</code></td><td>Puerto HTTP</td><td>3000</td></tr>
+  <tr><td><code>NODE_ENV</code></td><td><code>development</code> | <code>test</code> | <code>production</code></td><td>development</td></tr>
+  <tr><td><code>CORS_ORIGIN</code></td><td>Origen permitido por CORS</td><td>*</td></tr>
+  <tr><td><code>DATABASE_URL</code></td><td>Conexión a Postgres</td><td>postgres://axiom:axiom@localhost:5432/axiom</td></tr>
+  <tr><td><code>BETTER_AUTH_SECRET</code></td><td>Secreto de Better Auth</td><td>obligatorio</td></tr>
+  <tr><td><code>BETTER_AUTH_URL</code></td><td>URL pública de la API</td><td>http://localhost:3000</td></tr>
+  <tr><td><code>RESEND_API_KEY</code>, <code>MAIL_FROM</code></td><td>Envío real de correo (solo producción)</td><td>vacío</td></tr>
+</table>
+
+<h2 id="general">Convenciones</h2>
+<div class="card">
+  <p><strong>Formato:</strong> peticiones con <code>Content-Type: application/json</code>.</p>
+  <p><strong>Versionado:</strong> todo cuelga de <code>/api/v1</code>.</p>
+  <p><strong>Errores propios</strong> (rutas inexistentes, fallos internos): <code>{ "error": { "message", "code" } }</code>.</p>
+  <p><strong>Errores de auth</strong> (los devuelve Better Auth): <code>{ "message", "code" }</code>. Los dos formatos conviven por ahora.</p>
+  <p><strong>Seguridad base:</strong> <code>helmet</code> (cabeceras seguras) y <code>cors</code>.</p>
+</div>
+
+<h2 id="endpoints">Endpoints</h2>
+
+<h3>Utilidad</h3>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/health</span></div>
+  <p>Comprueba que la API responde.</p>
+  <pre><code>curl localhost:3000/api/v1/health
+{"status":"ok"}</code></pre>
+</div>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/ping</span></div>
+  <p>Ruta de ejemplo del patrón route → controller → service. Devuelve un contador en memoria.</p>
+  <pre><code>{"message":"pong","count":1}</code></pre>
+</div>
+
+<h3>Autenticación <span class="pill">/api/v1/auth</span></h3>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/sign-up/email</span></div>
+  <p>Crea la cuenta con contraseña, inicia sesión (devuelve <code>token</code>) y envía un código de verificación al correo. La verificación es opcional. El rol siempre es <code>buyer</code>; un <code>role</code> enviado en el cuerpo se ignora.</p>
+  <table>
+    <tr><th>Campo</th><th>Tipo</th><th>Notas</th></tr>
+    <tr><td><code>email</code></td><td>string</td><td>único</td></tr>
+    <tr><td><code>password</code></td><td>string</td><td>mínimo 8 caracteres</td></tr>
+    <tr><td><code>name</code></td><td>string</td><td>obligatorio</td></tr>
+  </table>
+  <pre><code>curl -X POST localhost:3000/api/v1/auth/sign-up/email \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ana@ejemplo.com","password":"Password-12345","name":"Ana"}'
+
+200 {"token":"…","user":{"id":"…","email":"ana@ejemplo.com","emailVerified":false,"role":"buyer",…}}
+422 {"message":"User already exists. Use another email.","code":"USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"}
+400 {"message":"Password too short","code":"PASSWORD_TOO_SHORT"}</code></pre>
+  <p class="warn">Registrar un correo que ya existe responde 422.</p>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/email-otp/verify-email</span></div>
+  <p>Verifica el correo con el código de 6 dígitos recibido.</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","otp":"123456"}'
+
+200 {"status":true,"token":null,"user":{…,"emailVerified":true}}
+400 {"message":"Invalid OTP","code":"INVALID_OTP"}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/sign-in/email</span></div>
+  <p>Inicia sesión con correo y contraseña. No exige el correo verificado.</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","password":"Password-12345"}'
+
+200 {"redirect":false,"token":"…","user":{…}}
+401 {"message":"Invalid email or password","code":"INVALID_EMAIL_OR_PASSWORD"}
+</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/email-otp/send-verification-otp</span></div>
+  <p>Envía (o reenvía) un código al correo. Un código nuevo invalida el anterior.</p>
+  <table>
+    <tr><th><code>type</code></th><th>Para qué</th></tr>
+    <tr><td><code>sign-in</code></td><td>Iniciar sesión con código</td></tr>
+    <tr><td><code>email-verification</code></td><td>Reenviar el código de verificación</td></tr>
+    <tr><td><code>forget-password</code></td><td>Reservado para recuperar contraseña (sin probar)</td></tr>
+  </table>
+  <pre><code>-d '{"email":"ana@ejemplo.com","type":"sign-in"}'
+200 {"success":true}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/sign-in/email-otp</span></div>
+  <p>Inicia sesión con el código recibido. Si el correo no existe, crea el usuario ya verificado (con <code>name</code> vacío).</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","otp":"123456"}'
+200 {"token":"…","user":{…,"emailVerified":true,"role":"buyer"}}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/auth/get-session</span></div>
+  <p>Devuelve la sesión actual o <code>null</code>. <strong class="warn">Todavía no acepta el token en <code>Authorization: Bearer</code></strong>: eso llega en la fase 3.</p>
+</div>
+
+<div class="note">Better Auth expone más rutas bajo <code>/api/v1/auth/*</code> (por ejemplo cambio y restablecimiento de contraseña, sign-out). Solo están documentadas arriba las que están probadas.</div>
+
+<h2 id="flujos">Flujos de auth</h2>
+<h3>A. Registro con contraseña</h3>
+<div class="flow">
+  <div><code>POST /sign-up/email</code>: se crea el usuario (<code>buyer</code>), se inicia sesión (devuelve <code>token</code>) y se envía un código de verificación.</div>
+  <div>Opcional: <code>POST /email-otp/verify-email</code> con el código marca el correo como verificado.</div>
+  <div>Más tarde: <code>POST /sign-in/email</code> devuelve <code>token</code> y <code>user</code>, verificado o no.</div>
+</div>
+<h3>B. Login con código (sin contraseña)</h3>
+<div class="flow">
+  <div><code>POST /email-otp/send-verification-otp</code> con <code>type: "sign-in"</code>.</div>
+  <div><code>POST /sign-in/email-otp</code> con el código: devuelve <code>token</code> y <code>user</code>.</div>
+</div>
+<div class="note"><strong>Limitación conocida:</strong> como la verificación es opcional, un usuario que se registró con contraseña y no verificó su correo <strong>pierde la contraseña</strong> si luego entra con código (Better Auth la borra y revoca sus sesiones para evitar robo de cuentas). Después, el login con contraseña da 401 hasta restablecerla. Comprobado con el código actual. Pendiente de decidir: exigir verificar antes de permitir el login con código, o aceptar este comportamiento.</div>
+
+<h3>Códigos de un solo uso</h3>
+<table>
+  <tr><th>Longitud</th><th>Caduca</th><th>Intentos</th><th>Almacenado</th></tr>
+  <tr><td>6 dígitos</td><td>10 minutos</td><td>3 (luego queda invalidado)</td><td>con hash</td></tr>
+</table>
+<p>En desarrollo y tests el correo no sale: el código se imprime en la consola del servidor (<code>[mail] to=… </code>).</p>
+
+<h2 id="errores">Errores</h2>
+<table>
+  <tr><th>HTTP</th><th>Cuándo</th><th>Cuerpo</th></tr>
+  <tr><td class="err">400</td><td>Datos inválidos, código incorrecto</td><td><code>{"message","code"}</code></td></tr>
+  <tr><td class="err">401</td><td>Credenciales incorrectas</td><td><code>INVALID_EMAIL_OR_PASSWORD</code></td></tr>
+  <tr><td class="err">404</td><td>Ruta inexistente</td><td><code>{"error":{"message","code":"NOT_FOUND"}}</code></td></tr>
+  <tr><td class="err">429</td><td>Demasiadas peticiones</td><td><code>{"message":"Too many requests…"}</code> y cabecera <code>x-retry-after</code></td></tr>
+  <tr><td class="err">500</td><td>Fallo interno</td><td><code>{"error":{"message","code":"INTERNAL_ERROR"}}</code> (en producción el mensaje es genérico)</td></tr>
+</table>
+
+<h2 id="limites">Rate limiting</h2>
+<p>Por IP, ventana de 60 s, activo en todos los entornos. Los contadores están en memoria (se reinician con el servidor).</p>
+<table>
+  <tr><th>Ruta</th><th>Máx. / minuto</th></tr>
+  <tr><td><code>/sign-up/email</code></td><td>5</td></tr>
+  <tr><td><code>/sign-in/email</code></td><td>5</td></tr>
+  <tr><td><code>/sign-in/email-otp</code></td><td>5</td></tr>
+  <tr><td><code>/email-otp/verify-email</code></td><td>5</td></tr>
+  <tr><td><code>/email-otp/send-verification-otp</code></td><td>3</td></tr>
+  <tr><td>resto de <code>/auth/*</code></td><td>100</td></tr>
+</table>
+
+<h2 id="definicion">Cómo se define</h2>
+<h3>Ciclo de una petición</h3>
+<pre><code>cliente
+  → pino-http (log)  → helmet  → cors
+  → /api/v1/auth/*splat  → Better Auth (toNodeHandler)   ← antes de express.json()
+  → express.json()
+  → /api/v1/*            → routes → controllers → services
+  → notFound (404)       → errorHandler (JSON)</code></pre>
+
+<h3>Estructura</h3>
+<table>
+  <tr><th>Ruta</th><th>Qué contiene</th></tr>
+  <tr><td><code>src/app.js</code></td><td>Crea la app y ordena los middlewares (<code>createApp()</code>, sin <code>listen</code>)</td></tr>
+  <tr><td><code>src/server.js</code></td><td>Arranca el servidor y cierra ordenadamente con SIGTERM/SIGINT</td></tr>
+  <tr><td><code>src/config/index.js</code></td><td>Lee variables de entorno (dotenv)</td></tr>
+  <tr><td><code>src/routes/</code>, <code>controllers/</code>, <code>services/</code></td><td>Patrón route → controller → service (hoy health y ping)</td></tr>
+  <tr><td><code>src/middlewares/errorHandler.js</code></td><td><code>HttpError</code>, 404 y manejador global</td></tr>
+  <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugin <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
+  <tr><td><code>src/mail/index.js</code></td><td>Transport de correo: consola (dev/test, guarda en <code>outbox</code>) o Resend (producción)</td></tr>
+  <tr><td><code>src/db/</code></td><td>Conexión (<code>index.js</code>) y esquema generado (<code>schema.js</code>)</td></tr>
+  <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
+  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code></td></tr>
+</table>
+
+<h3>Modelo de datos</h3>
+<table>
+  <tr><th>Tabla</th><th>Para qué</th><th>Campos clave</th></tr>
+  <tr><td><code>user</code></td><td>Cuenta</td><td>id, email (único), email_verified, name, <strong>role</strong> (<code>buyer</code> por defecto, no nulo)</td></tr>
+  <tr><td><code>session</code></td><td>Sesiones</td><td>token (único), expires_at, user_id</td></tr>
+  <tr><td><code>account</code></td><td>Credenciales e identidades</td><td>provider_id, account_id, password (hash), user_id</td></tr>
+  <tr><td><code>verification</code></td><td>Códigos de un solo uso</td><td>identifier, value (hash), expires_at</td></tr>
+</table>
+<p>El esquema se genera desde la configuración de auth (<code>npm run auth:schema</code>) y se migra con Drizzle (<code>npm run db:generate</code> y <code>npm run db:migrate</code>).</p>
+
+<h3>Decisiones de diseño</h3>
+<ul>
+  <li><strong>Roles:</strong> uno por usuario (<code>buyer</code> | <code>seller</code>). Nace <code>buyer</code>; pasará a <code>seller</code> al crear una tienda (fase 5). El cliente no puede elegirlo (<code>input: false</code>).</li>
+  <li><strong>Sesión móvil:</strong> token de sesión opaco y revocable de Better Auth, no JWT con refresh.</li>
+  <li><strong>Envío de correo sin <code>await</code>:</strong> evita diferencias de tiempo que revelen si un correo existe.</li>
+</ul>
+
+<h2 id="pendiente">Pendiente</h2>
+<table>
+  <tr><th>Fase</th><th>Qué falta</th></tr>
+  <tr><td>3</td><td>Aceptar el token con <code>Authorization: Bearer</code> (plugin <code>bearer</code>), <code>requireAuth</code>, <code>requireRole</code> y <code>GET /auth/me</code></td></tr>
+  <tr><td>5</td><td>Tiendas: <code>POST /stores</code> y cambio de rol a <code>seller</code></td></tr>
+  <tr><td>—</td><td>Resend con API key real, recuperación de contraseña, rate limit compartido, proxy de confianza para IP</td></tr>
+</table>
+
+<footer>Generado a partir del estado actual del código y de respuestas reales del servidor local. Detalle del avance en <code>progress.md</code> y decisiones en <code>auth-options.md</code>.</footer>
+</div>
+</body>
+</html>

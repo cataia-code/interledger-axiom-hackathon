@@ -10,7 +10,7 @@
     "start": "node src/server.js",
     "dev": "node --watch src/server.js",
     "lint": "eslint .",
-    "test": "node --test",
+    "test": "NODE_ENV=test node --test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:up": "docker compose up -d db",
@@ -25,7 +25,8 @@
     "helmet": "^8.3.0",
     "pg": "^8.23.1",
     "pino": "^10.4.0",
-    "pino-http": "^11.0.0"
+    "pino-http": "^11.0.0",
+    "resend": "^6.34.0"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

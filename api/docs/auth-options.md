@@ -90,6 +90,9 @@ Datos a guardar: email (normalizado en minúsculas, único), hash de clave (null
 
 Todas las decisiones están tomadas.
 
+### Simplificación posterior
+El login queda en contraseña + código por correo. La verificación del email es opcional (no bloquea el login) y el login con Google se retira del plan; puede añadirse más adelante sin cambiar el modelo.
+
 ## Decisiones pendientes (original)
 
 1. ¿Magic link solo, o también contraseña? *Sugerido: solo magic link.*
