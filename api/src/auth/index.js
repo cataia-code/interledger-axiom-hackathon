@@ -11,12 +11,18 @@ export const auth = betterAuth({
   baseURL: config.authUrl,
   secret: config.authSecret,
   database: drizzleAdapter(db, { provider: 'pg', schema }),
+  advanced: {
+    database: { generateId: 'serial' }, // ids numéricos generados por la base de datos
+    // Detrás de un proxy, Better Auth debe leer la IP real (rate limit y sesiones).
+    ...(config.trustProxy ? { ipAddress: { ipAddressHeaders: ['x-forwarded-for'] } } : {}),
+  },
   emailAndPassword: {
     enabled: true,
   },
   user: {
     additionalFields: {
       role: { type: 'string', required: true, defaultValue: 'buyer', input: false },
+      phone: { type: 'string', required: false, input: false },
     },
   },
   plugins: [
@@ -41,6 +47,8 @@ export const auth = betterAuth({
     customRules: {
       '/email-otp/send-verification-otp': { window: 60, max: 3 },
       '/email-otp/verify-email': { window: 60, max: 5 },
+      '/email-otp/request-password-reset': { window: 60, max: 3 },
+      '/email-otp/reset-password': { window: 60, max: 5 },
     },
   },
 });

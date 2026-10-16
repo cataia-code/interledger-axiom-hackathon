@@ -14,6 +14,7 @@ const closedAuthPaths = new Set(['/api/v1/auth/sign-up/email', '/api/v1/auth/sig
 
 export function createApp() {
   const app = express();
+  app.set('trust proxy', config.trustProxy);
 
   app.use(pinoHttp({ enabled: config.env !== 'test' }));
   app.use(helmet());
@@ -29,6 +30,12 @@ export function createApp() {
   app.all('/api/v1/auth/*splat', toNodeHandler(auth));
 
   app.use(express.json());
+
+  // Imágenes subidas (disco local del servidor).
+  app.use('/uploads', (req, res, next) => {
+    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  }, express.static(config.uploadDir, { fallthrough: false, maxAge: '7d', immutable: true }));
 
   app.use('/api/v1', routes);
 

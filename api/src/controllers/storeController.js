@@ -1,11 +1,8 @@
-import { validateStoreInput } from '../services/storeService.js';
-import { addStore, presentStore } from '../services/sellerService.js';
+import { getPublicStore, presentPublicStore } from '../services/sellerService.js';
 
-export async function postStore(req, res, next) {
+export async function getStore(req, res, next) {
   try {
-    const input = validateStoreInput(req.body);
-    const created = await addStore(req.auth.user.id, input);
-    res.status(201).json({ store: presentStore(created) });
+    res.json({ store: presentPublicStore(await getPublicStore(req.params.id)) });
   } catch (err) {
     next(err);
   }

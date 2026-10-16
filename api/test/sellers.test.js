@@ -17,10 +17,11 @@ let n = 0;
 const email = (tag) => `${tag}${Date.now()}${n++}@sellertest.local`;
 const post = (path, body) => request(app).post(`${base}${path}`).send(body);
 const me = (token) => request(app).get('/api/v1/me').set('Authorization', `Bearer ${token}`);
-const orgData = (taxId = `TAX-${Date.now()}-${n++}`) => ({
+const orgData = (taxId = `TAX-${Date.now()}-${n++}`, legalId = `LEG-${Date.now()}-${n++}`) => ({
   legalName: 'Panadería Luna S.A.',
   tradeName: 'Luna',
   taxId,
+  legalId,
   country: 'pa',
   legalAddress: 'Calle 50, Ciudad de Panamá',
   phone: '+507 555 0100',
@@ -30,6 +31,10 @@ const storeData = (extra = {}) => ({
   description: 'Cosas buenas',
   address: 'Av. Central 123',
   city: 'Ciudad de Panamá',
+  latitude: 8.9824,
+  longitude: -79.5199,
+  legalId: 'SUC-001',
+  currency: 'usd',
   ...extra,
 });
 const sellerBody = (e, extra = {}) => ({
@@ -56,6 +61,11 @@ test('seller sign-up creates user, organization and first store together', async
   assert.equal(res.body.organization.legalName, 'Panadería Luna S.A.');
   assert.equal(res.body.organization.country, 'PA');
   assert.equal(res.body.store.name, 'Sucursal Centro');
+  assert.equal(res.body.store.currency, 'USD');
+  assert.equal(res.body.store.latitude, 8.9824);
+  assert.equal(res.body.store.status, 'active');
+  assert.equal(typeof res.body.store.id, 'number');
+  assert.equal(typeof res.body.user.id, 'number');
   assert.equal(res.body.store.organizationId, res.body.organization.id);
   const orgs = await db.select().from(organization).where(eq(organization.userId, res.body.user.id));
   assert.equal(orgs.length, 1);
@@ -70,11 +80,16 @@ test('seller sign-up with invalid data creates nothing', async () => {
     [{ organization: { ...orgData(), country: 'PAN' } }, 'INVALID_COUNTRY'],
     [{ organization: { ...orgData(), taxId: 'x' } }, 'INVALID_TAX_ID'],
     [{ organization: { ...orgData(), legalAddress: 'abc' } }, 'INVALID_LEGAL_ADDRESS'],
+    [{ organization: { ...orgData(), legalId: '' } }, 'INVALID_LEGAL_ID'],
     [{ store: undefined }, 'INVALID_NAME'],
     [{ store: storeData({ name: 'a' }) }, 'INVALID_NAME'],
     [{ store: storeData({ description: 'd'.repeat(501) }) }, 'INVALID_DESCRIPTION'],
     [{ store: storeData({ address: '' }) }, 'INVALID_ADDRESS'],
     [{ store: storeData({ city: '' }) }, 'INVALID_CITY'],
+    [{ store: storeData({ latitude: 91 }) }, 'INVALID_LATITUDE'],
+    [{ store: storeData({ longitude: 'abc' }) }, 'INVALID_LONGITUDE'],
+    [{ store: storeData({ legalId: 'x' }) }, 'INVALID_LEGAL_ID'],
+    [{ store: storeData({ currency: 'DOLLAR' }) }, 'INVALID_CURRENCY'],
   ];
   for (const [extra, code] of cases) {
     const e = email('b');
@@ -174,32 +189,21 @@ test('a seller without a store or without an organization cannot log in as selle
   assert.equal(noOrg.body.error.code, 'ORGANIZATION_REQUIRED');
 });
 
-test('a seller can add branches to the organization', async () => {
-  const { body } = await post('/seller/sign-up', sellerBody(email('k')));
-  const res = await withAuth(request(app).post('/api/v1/stores'), body.token).send(
-    storeData({ name: 'Sucursal Norte', address: 'Calle Norte 9', city: 'Colón', phone: '555-0101' }),
-  );
-  assert.equal(res.status, 201);
-  assert.equal(res.body.store.organizationId, body.organization.id);
-  assert.equal(res.body.store.city, 'Colón');
-  const rows = await db.select().from(store).where(eq(store.organizationId, body.organization.id));
-  assert.equal(rows.length, 2);
-
-  const dup = await withAuth(request(app).post('/api/v1/stores'), body.token).send(storeData({ name: 'Sucursal Norte' }));
-  assert.equal(dup.status, 409);
-  assert.equal(dup.body.error.code, 'STORE_NAME_ALREADY_EXISTS');
-
-  const invalid = await withAuth(request(app).post('/api/v1/stores'), body.token).send({ name: 'x' });
-  assert.equal(invalid.status, 400);
+test('a repeated legal id is rejected', async () => {
+  const legalId = `DUPL-${Date.now()}`;
+  assert.equal((await post('/seller/sign-up', sellerBody(email('n1'), { organization: orgData(undefined, legalId) }))).status, 201);
+  const second = await post('/seller/sign-up', sellerBody(email('n2'), { organization: orgData(undefined, legalId) }));
+  assert.equal(second.status, 409);
+  assert.equal(second.body.error.code, 'LEGAL_ID_ALREADY_EXISTS');
 });
 
-test('POST /stores is only for sellers', async () => {
-  const anon = await request(app).post('/api/v1/stores').send(storeData());
-  assert.equal(anon.status, 401);
-  const { body } = await post('/buyer/sign-up', { email: email('l'), password: PASSWORD, name: 'B' });
-  const res = await withAuth(request(app).post('/api/v1/stores'), body.token).send(storeData());
-  assert.equal(res.status, 403);
-  assert.equal(res.body.error.code, 'FORBIDDEN');
+test('an organization has a single store: the database refuses a second one', async () => {
+  const { body } = await post('/seller/sign-up', sellerBody(email('k')));
+  await assert.rejects(
+    db.insert(store).values({ organizationId: body.organization.id, ...storeData(), currency: 'USD', legalId: 'X-2' }),
+  );
+  const gone = await withAuth(request(app).post('/api/v1/stores'), body.token).send(storeData());
+  assert.equal(gone.status, 404);
 });
 
 test('deleting the user deletes the organization and its stores', async () => {

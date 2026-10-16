@@ -72,17 +72,34 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 
 ## Diseño del marketplace
 
-- `docs/requirements.html`: requerimientos funcionales por módulo (catálogo con descuentos, inventario, pedidos sin envío, pagos y comisión) y modelo de base de datos propuesto, con diagrama ER y preguntas abiertas. Es solo diseño: nada de eso está implementado.
+- `docs/requirements.html`: requerimientos funcionales por módulo (catálogo con descuentos, inventario, pedidos sin envío, pagos y comisión) y modelo de base de datos, con estado de cada uno (qué hay y qué no), diagrama ER y preguntas abiertas.
+
+### Desarrollo del marketplace (fases 0 a 6, plan aprobado)
+
+Implementa los requerimientos MVP de `docs/requirements.html` (51 de 61; el resto es "Posterior" salvo el formato de error único, RF-TRA-04).
+
+- **Fase 0, ids numéricos y sucursal única.** Better Auth con `advanced.database.generateId: 'serial'`; `organization` y `store` con `bigint identity`. Una sola migración limpia (`drizzle/0000_init.sql`; se reinició la base de desarrollo). `organization.legal_id`; `store`: `latitude`, `longitude`, `legal_id`, `currency`, `status`, `deleted_at` y UNIQUE sobre `organization_id`. `POST /stores` se retiró. Los ids viajan como números.
+- **Fase 1, perfil y sucursal.** `PATCH /me` (nombre, teléfono; columna `user.phone`), recuperación de contraseña con código (rutas de `email-otp`, con rate limit), `GET/PATCH /seller/organization`, `GET/PATCH/DELETE /seller/store`, `GET /stores/:id`.
+- **Fase 2, catálogo.** `src/db/catalog.js`: `category` (por sucursal), `item`, `item_discount`, `item_image`. CRUD del seller, descuentos (uno vigente a la vez), imágenes con `multer` + `sharp` (WebP 1024×1024 en disco local, hasta 8 por ítem, servidas en `/uploads`), listado público con búsqueda, filtros, orden y cursor.
+- **Fase 3, inventario.** `src/db/inventory.js`: `stock_movement` (libro) y `stock_reservation`. `applyStockMovement` es la única vía para cambiar `item.current_stock`; bloqueo de filas y pruebas de concurrencia. El público ve `available`, no el stock real.
+- **Fase 4, carrito y pedidos.** `src/db/orders.js`. Carrito de una sola sucursal; checkout idempotente (`Idempotency-Key`) con precios congelados, reserva de 15 min y comisión 0.1 %; máquina de estados (`orderStateMachine.js`) con historial; cancelación del buyer y del seller; job que cancela pedidos sin pagar. Los ítems se bloquean antes de insertar `order_item` para evitar interbloqueos.
+- **Fase 5, pagos.** `src/db/payments.js` y `src/payments/placeholder.js`. Pago iniciado por el buyer, confirmación por webhook propio (`X-Webhook-Secret`), eventos procesados una sola vez, reintentos, reembolsos totales y parciales sin superar lo cobrado, y reembolso automático si el dinero llega tarde.
+- **Fase 6, cierre.** Revisión de permisos por propiedad (403/404), pruebas de carrera, `docs/api-usage.html` y `docs/requirements.html` actualizados.
+- **Verificación:** `npm run lint` y `npm test` (65 pruebas, estables en varias ejecuciones) y un recorrido real contra el servidor (registro → ítem con descuento → checkout → pago → completar → reembolso).
+
+### Auditoría y endurecimiento
+
+- Auditoría completa en `docs/audit-report.html`: 65 pruebas, 116 comprobaciones de caja negra, 22 de integridad de datos, rendimiento y escala (100 000 ítems).
+- Correcciones: manejador `pool.on('error')` (la API se caía si Postgres cortaba una conexión), rate limit en toda la API y en checkout, pago, imágenes y webhook (`src/middlewares/rateLimit.js`), `CORS_ORIGIN` obligatorio y sin `*` en producción, `TRUST_PROXY`, e índices (`pg_trgm`, precio) en la migración `0006`. Pruebas: 71/71 (`test/hardening.test.js`).
 
 ## No hecho
 
-- Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
-- Recuperación de contraseña (los endpoints existen en el plugin pero no están probados ni se envía un correo específico).
-- Almacén de rate limit compartido: hoy es en memoria (se reinicia con el servidor y no sirve con varias instancias).
-- Detrás de un proxy hay que configurar `trust proxy` en Express y `advanced.ipAddress` en Better Auth; si no, el límite por IP se aplica a la IP del proxy.
-- Ítems por sucursal (tabla y endpoints); ver, editar o borrar organización y sucursales (solo existe la creación).
-- Unificar el formato de error de las rutas compartidas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`) con el del resto de la API.
-- Pagos, pedidos, frontend/app móvil y despliegue quedan fuera de alcance.
+- Proveedor de pago real (hoy `placeholder`), liquidación al seller y conciliación. Falta definir quién absorbe la comisión.
+- Notificaciones, auditoría, variantes de ítem, importación CSV, aviso de stock bajo, eliminar cuenta (todo "Posterior").
+- Imágenes en un bucket (hoy disco local), almacén de rate limit compartido (hoy en memoria; con varias instancias hace falta Redis).
+- Envío real con Resend: nunca se probó con una API key real.
+- Unificar el formato de error de las rutas compartidas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`) con el del resto (RF-TRA-04).
+- Datos legales de `organization` provisionales; un reembolso no ajusta la comisión ya guardada.
 
 ## Notas y desviaciones
 

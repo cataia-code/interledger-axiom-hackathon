@@ -19,7 +19,7 @@ async function callAuth(fn) {
   }
 }
 
-const publicUser = ({ id, email, name, role, emailVerified }) => ({ id, email, name, role, emailVerified });
+const publicUser = ({ id, email, name, role, emailVerified }) => ({ id: Number(id), email, name, role, emailVerified });
 
 async function revokeSession(token) {
   await db.delete(session).where(eq(session.token, token));

@@ -77,10 +77,10 @@
 <div class="wrap">
 
 <h1>Axiom API</h1>
-<p class="sub">Estado actual de la API REST (login separado por rol, contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
+<p class="sub">Estado actual de la API REST (auth por rol, catálogo, inventario, pedidos y pagos): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
 <nav>
   <a href="#resumen">Resumen</a><a href="#arranque">Arranque</a><a href="#general">Convenciones</a>
-  <a href="#endpoints">Endpoints</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
+  <a href="#endpoints">Endpoints</a><a href="#marketplace">Marketplace</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
   <a href="#limites">Rate limit</a><a href="#definicion">Cómo se define</a><a href="#modelo">Modelo relacional</a><a href="#pendiente">Pendiente</a>
 </nav>
 
@@ -91,6 +91,7 @@
     <span class="tag pill">Express 5</span><span class="tag pill">Better Auth 1.7</span><span class="tag pill">Drizzle ORM</span>
     <span class="tag pill">PostgreSQL 17</span><span class="tag pill">node --test + supertest</span><span class="tag pill">ESLint</span>
   </p>
+  <p>Los ids son numéricos. Dinero siempre en unidades menores de la moneda de la sucursal (centavos), nunca decimales. Listas con paginación por cursor (<code>?limit</code>, <code>?cursor</code> → <code>nextCursor</code>).</p>
   <p>URL base local: <code>http://localhost:3000/api/v1</code>. Todas las respuestas son JSON.</p>
 </div>
 
@@ -142,8 +143,9 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/me</span></div>
   <p>Devuelve el usuario de la sesión. Requiere <code>Authorization: Bearer &lt;token&gt;</code>, con el <code>token</code> que devuelven el registro y el login (o la cabecera <code>set-auth-token</code>).</p>
   <pre><code>curl localhost:3000/api/v1/me -H 'Authorization: Bearer &lt;token&gt;'
-200 {"user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
+200 {"user":{"id":1,"email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false,"phone":null}}
 401 {"error":{"message":"Authentication required","code":"UNAUTHORIZED"}}</code></pre>
+  <p><code>PATCH /api/v1/me</code> edita <code>name</code> (1-80) y <code>phone</code> (hasta 30, o <code>null</code>); el resto de campos se ignora. 400 <code>EMPTY_UPDATE</code> si no hay nada que cambiar.</p>
   <p>Está en <code>/api/v1/me</code> y no bajo <code>/auth</code>, porque <code>/api/v1/auth/*</code> lo atiende Better Auth.</p>
 </div>
 
@@ -170,13 +172,14 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 
 <div class="card">
   <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/seller/sign-up</span></div>
-  <p>Crea <strong>usuario, organización y primera sucursal en un solo paso</strong>, con rol <code>seller</code>. Todo se valida antes de crear nada, y si algo falla la cuenta se deshace: nunca queda un vendedor sin organización ni sucursal. No se puede registrar con un correo que ya existe, ni siquiera como comprador.</p>
+  <p>Crea <strong>usuario, organización y su única sucursal en un solo paso</strong>, con rol <code>seller</code>. Todo se valida antes de crear nada, y si algo falla la cuenta se deshace: nunca queda un vendedor sin organización ni sucursal. No se puede registrar con un correo que ya existe, ni siquiera como comprador.</p>
   <table>
     <tr><th>Campo</th><th>Tipo</th><th>Notas</th></tr>
     <tr><td><code>email</code>, <code>password</code>, <code>name</code></td><td>string</td><td>igual que el comprador</td></tr>
     <tr><td><code>organization.legalName</code></td><td>string</td><td>razón social, obligatorio, 2-120</td></tr>
     <tr><td><code>organization.tradeName</code></td><td>string</td><td>nombre comercial, opcional, hasta 120</td></tr>
     <tr><td><code>organization.taxId</code></td><td>string</td><td>identificación fiscal, obligatorio, 3-40, <strong>único</strong></td></tr>
+    <tr><td><code>organization.legalId</code></td><td>string</td><td>identificador legal (p. ej. registro mercantil), 3-40, <strong>único</strong></td></tr>
     <tr><td><code>organization.country</code></td><td>string</td><td>código ISO de 2 letras (se guarda en mayúsculas)</td></tr>
     <tr><td><code>organization.legalAddress</code></td><td>string</td><td>obligatorio, 5-200</td></tr>
     <tr><td><code>organization.phone</code></td><td>string</td><td>opcional, hasta 30</td></tr>
@@ -184,16 +187,19 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
     <tr><td><code>store.description</code></td><td>string</td><td>opcional, hasta 500</td></tr>
     <tr><td><code>store.address</code>, <code>store.city</code></td><td>string</td><td>obligatorios (5-200 y 2-80)</td></tr>
     <tr><td><code>store.phone</code></td><td>string</td><td>opcional, hasta 30</td></tr>
+    <tr><td><code>store.latitude</code>, <code>store.longitude</code></td><td>número</td><td>obligatorios (−90…90 y −180…180)</td></tr>
+    <tr><td><code>store.legalId</code></td><td>string</td><td>identificador legal de la sucursal, 3-40</td></tr>
+    <tr><td><code>store.currency</code></td><td>string</td><td>moneda ISO 4217 de 3 letras; todos los precios de la sucursal van en ella (no se puede cambiar)</td></tr>
   </table>
   <pre><code>-d '{"email":"luna@ejemplo.com","password":"Password-12345","name":"Luna",
-     "organization":{"legalName":"Panadería Luna S.A.","taxId":"8-123-456","country":"PA","legalAddress":"Calle 50, Ciudad de Panamá"},
-     "store":{"name":"Sucursal Centro","address":"Av. Central 123","city":"Ciudad de Panamá"}}'
+     "organization":{"legalName":"Panadería Luna S.A.","taxId":"8-123-456","legalId":"RM-2024-001","country":"PA","legalAddress":"Calle 50, Ciudad de Panamá"},
+     "store":{"name":"Sucursal Centro","address":"Av. Central 123","city":"Ciudad de Panamá","latitude":8.98,"longitude":-79.52,"legalId":"SUC-001","currency":"USD"}}'
 
 201 {"token":"…","user":{…,"role":"seller"},
-     "organization":{"id":"…","legalName":"Panadería Luna S.A.","tradeName":null,"taxId":"8-123-456","country":"PA","legalAddress":"…","phone":null,"createdAt":"…"},
+     "organization":{"id":"…","legalName":"Panadería Luna S.A.","tradeName":null,"taxId":"8-123-456","legalId":"RM-2024-001","country":"PA","legalAddress":"…","phone":null,"createdAt":"…"},
      "store":{"id":"…","organizationId":"…","name":"Sucursal Centro","address":"Av. Central 123","city":"Ciudad de Panamá",…}}
-400 {"error":{"message":"…","code":"INVALID_LEGAL_NAME"}}   (también INVALID_COUNTRY, INVALID_TAX_ID, INVALID_LEGAL_ADDRESS, INVALID_NAME, INVALID_ADDRESS, INVALID_CITY, INVALID_PHONE…)
-409 {"error":{"message":"That tax id is already registered","code":"TAX_ID_ALREADY_EXISTS"}}
+400 {"error":{"message":"…","code":"INVALID_LEGAL_NAME"}}   (también INVALID_COUNTRY, INVALID_TAX_ID, INVALID_LEGAL_ADDRESS, INVALID_NAME, INVALID_ADDRESS, INVALID_CITY, INVALID_LEGAL_ID, INVALID_LATITUDE, INVALID_LONGITUDE, INVALID_CURRENCY, INVALID_PHONE…)
+409 TAX_ID_ALREADY_EXISTS · LEGAL_ID_ALREADY_EXISTS
 422 USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL</code></pre>
 </div>
 
@@ -216,16 +222,8 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 400 {"message":"Invalid OTP","code":"INVALID_OTP"}   403 WRONG_ROLE</code></pre>
 </div>
 
-<h3>Sucursales <span class="pill">/api/v1/stores</span></h3>
-<div class="card">
-  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/stores</span></div>
-  <p>Añade una sucursal a la organización del vendedor autenticado (<code>Authorization: Bearer</code>). Solo para <code>seller</code>. Campos: los mismos de <code>store</code> del registro.</p>
-  <pre><code>-d '{"name":"Sucursal Norte","address":"Calle Norte 9","city":"Colón","phone":"555-0101"}'
-
-201 {"store":{"id":"…","organizationId":"…","name":"Sucursal Norte","address":"Calle Norte 9","city":"Colón","phone":"555-0101",…}}
-400 {"error":{…,"code":"INVALID_NAME"}}        401 UNAUTHORIZED       403 FORBIDDEN (no es seller)
-409 {"error":{"message":"The organization already has a store with that name","code":"STORE_NAME_ALREADY_EXISTS"}}</code></pre>
-</div>
+<h3>Recuperar contraseña</h3>
+<p><code>POST /api/v1/auth/email-otp/request-password-reset</code> con <code>{"email"}</code> envía un código al correo; <code>POST /api/v1/auth/email-otp/reset-password</code> con <code>{"email","otp","password"}</code> cambia la contraseña. Las sesiones anteriores se revocan.</p>
 
 <h3>Rutas compartidas <span class="pill">/api/v1/auth/*</span> (Better Auth)</h3>
 
@@ -257,6 +255,30 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 
 <div class="note">Better Auth expone más rutas bajo <code>/api/v1/auth/*</code> (por ejemplo cambio y restablecimiento de contraseña, <code>get-session</code>). Solo están documentadas arriba las que están probadas. Estas rutas devuelven errores como <code>{"message","code"}</code>, sin el envoltorio <code>error</code>.</div>
 
+<h2 id="marketplace">Marketplace</h2>
+<p>Rutas bajo <code>/api/v1</code>. «seller» y «buyer» exigen <code>Authorization: Bearer</code> con ese rol (401 sin sesión, 403 con otro rol).</p>
+<h3>Sucursal y organización (vendedor)</h3>
+<p>Cada organización tiene una sola sucursal en el MVP. <code>taxId</code>, <code>legalId</code>, <code>country</code>, <code>currency</code> y el <code>legalId</code> de la sucursal no se pueden editar. Cerrar la sucursal no borra su historial; el vendedor ya no puede iniciar sesión como tal (<code>STORE_REQUIRED</code>). Ya no existe <code>POST /stores</code> (404).</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/organization</code></td><td>seller</td><td>Datos legales de la organización</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/organization</code></td><td>seller</td><td>Edita <code>legalName</code>, <code>tradeName</code>, <code>legalAddress</code>, <code>phone</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/store</code></td><td>seller</td><td>Sucursal propia</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/store</code></td><td>seller</td><td>Edita nombre, descripción, dirección, ciudad, teléfono, lat/lon y <code>status</code> (<code>active</code> | <code>paused</code>)</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/store</code></td><td>seller</td><td>Cierra la sucursal (<code>status: closed</code>, borrado lógico)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/stores/:id</code></td><td>público</td><td>Vista pública de la sucursal; 404 si está cerrada</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/stores/:id/categories</code></td><td>público</td><td>Categorías de la sucursal</td></tr></table>
+<h3>Catálogo (vendedor)</h3>
+<p>Todo se limita a la sucursal del vendedor: lo de otra sucursal responde 403 <code>FORBIDDEN</code> (404 si no existe). <code>priceAmount</code> es entero ≥ 0. Estados del ítem: <code>draft</code>, <code>active</code>, <code>inactive</code>; solo los <code>active</code> de una sucursal activa se ven públicamente. El SKU es único por sucursal (409 <code>SKU_ALREADY_EXISTS</code>), incluso si el ítem se borró.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/categories</code></td><td>seller</td><td>Categorías propias (árbol con <code>parentId</code>)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/categories</code></td><td>seller</td><td>Crea (<code>name</code>, <code>slug</code> opcional, <code>parentId</code> opcional). 409 <code>CATEGORY_SLUG_EXISTS</code></td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/categories/:id</code></td><td>seller</td><td>Edita; 400 <code>CATEGORY_CYCLE</code> si crea un ciclo</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/categories/:id</code></td><td>seller</td><td>Borra; sus ítems quedan sin categoría y las hijas suben a la raíz</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items</code></td><td>seller</td><td>Lista (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items</code></td><td>seller</td><td>Crea: <code>sku</code>, <code>name</code>, <code>description</code>, <code>priceAmount</code>, <code>categoryId</code>, <code>status</code> (por defecto <code>draft</code>), <code>initialStock</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Detalle con imágenes, descuentos y stock</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Edición parcial</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Borrado lógico (204)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/discounts</code></td><td>seller</td><td><code>type</code> <code>percent</code> (puntos base, 1500 = 15 %) o <code>fixed</code> (&lt; precio), <code>startsAt</code>, <code>endsAt</code>. Solo un descuento a la vez: 409 <code>DISCOUNT_OVERLAP</code></td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id/discounts/:discountId</code></td><td>seller</td><td>Desactiva el descuento</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/images</code></td><td>seller</td><td><code>multipart/form-data</code>, campo <code>image</code> (JPEG, PNG o WebP, hasta 5 MB). Se recorta a 1024×1024, se comprime a WebP y se guarda en disco; hasta 8 por ítem</td></tr><tr><td><span class="m post" style="background:#8a5a00">PUT</span></td><td><code>/seller/items/:id/images/order</code></td><td>seller</td><td><code>{"ids":[…]}</code> con todas las imágenes en el nuevo orden</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id/images/:imageId</code></td><td>seller</td><td>Borra la imagen y su archivo</td></tr></table>
+<h3>Catálogo (comprador, público)</h3>
+<p>Sin autenticación. Muestra <code>available</code> (stock menos reservas), nunca el stock real. Cada ítem trae <code>currency</code>, <code>discount</code>, <code>discountAmount</code> y <code>finalPriceAmount</code>. Las imágenes se sirven en <code>/uploads/…</code> (campo <code>url</code>).</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/items</code></td><td>público</td><td>Filtros <code>categoryId</code>, <code>storeId</code>, <code>q</code> (texto en nombre y descripción), <code>sort</code> (<code>newest</code> | <code>price_asc</code> | <code>price_desc</code>), <code>limit</code> (1-50), <code>cursor</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/items/:id</code></td><td>público</td><td>Detalle de un ítem</td></tr></table>
+<h3>Inventario (vendedor)</h3>
+<p><code>item.current_stock</code> se actualiza en la misma transacción que cada movimiento del libro <code>stock_movement</code> (<code>initial</code>, <code>restock</code>, <code>adjustment</code>, <code>sale</code>, <code>cancel</code>) y nunca baja de 0 (409 <code>INSUFFICIENT_STOCK</code>, también con compras simultáneas). El resumen incluye <code>consistent</code>: el stock guardado coincide con la suma de movimientos.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id/stock</code></td><td>seller</td><td><code>currentStock</code>, <code>reserved</code>, <code>available</code>, <code>movementsTotal</code>, <code>consistent</code></td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/stock</code></td><td>seller</td><td><code>{"type":"restock","quantity":5}</code> o <code>{"type":"adjustment","delta":-2,"reason":"merma"}</code> (el ajuste exige motivo)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id/stock-movements</code></td><td>seller</td><td>Historial, más reciente primero, con cursor</td></tr></table>
+<h3>Carrito y pedidos (comprador)</h3>
+<p>El carrito es de una sola sucursal (409 <code>CART_OTHER_STORE</code>). El checkout exige la cabecera <code>Idempotency-Key</code> (8-80 caracteres): crea el pedido a la sucursal con nombre, SKU, precio original, descuento y precio unitario congelados, reserva el stock (15 min) y convierte el carrito; repetir la misma clave devuelve el mismo pedido (200). Comisión del marketplace: <code>commissionRate</code> 0.001 (0.1 %) sobre el total, guardada en el pedido. Un pedido ajeno responde 404 <code>ORDER_NOT_FOUND</code>.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/cart</code></td><td>buyer</td><td>Carrito con precios y disponibilidad actuales</td></tr><tr><td><span class="m post" style="background:#8a5a00">PUT</span></td><td><code>/cart/items/:itemId</code></td><td>buyer</td><td><code>{"quantity":2}</code> (1-999); reemplaza la cantidad. 409 <code>INSUFFICIENT_STOCK</code></td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/cart/items/:itemId</code></td><td>buyer</td><td>Quita el ítem</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/cart</code></td><td>buyer</td><td>Vacía el carrito (204)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders</code></td><td>buyer</td><td>Checkout. 201 (nuevo) o 200 (misma clave). 400 <code>CART_EMPTY</code>, 409 <code>INSUFFICIENT_STOCK</code> / <code>ITEM_UNAVAILABLE</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders</code></td><td>buyer</td><td>Mis pedidos (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders/:id</code></td><td>buyer</td><td>Pedido con líneas e historial de estados</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders/:id/cancel</code></td><td>buyer</td><td>Cancela (pendiente de pago o pagado); libera o devuelve stock y reembolsa lo cobrado</td></tr></table>
+<h3>Pedidos (vendedor)</h3>
+<p>Estados: <code>pending_payment → paid → preparing → completed</code>, con <code>cancelled</code> y <code>refunded</code>. No hay envíos. Un salto inválido responde 409 <code>INVALID_TRANSITION</code>. Los pedidos sin pagar en 15 minutos se cancelan solos y liberan su stock.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders</code></td><td>seller</td><td>Pedidos de la sucursal (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders/:id</code></td><td>seller</td><td>Detalle e historial</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/orders/:id/status</code></td><td>seller</td><td><code>{"status":"preparing"|"completed"|"cancelled","note":"…"}</code></td></tr></table>
+<h3>Pagos y reembolsos</h3>
+<p>El proveedor de pago es un <strong>placeholder</strong> (<code>provider: "placeholder"</code>) sin definir. El cobro se confirma con un webhook propio protegido por la cabecera <code>X-Webhook-Secret</code> (variable <code>PAYMENT_WEBHOOK_SECRET</code>); al cambiar de proveedor solo se reemplaza el adaptador en <code>src/payments/</code>. Cada evento (<code>eventId</code>) se procesa una sola vez. Si llega un cobro cuando el pedido ya no se puede pagar (cancelado, o sin stock tras vencer la reserva), se reembolsa completo.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders/:id/pay</code></td><td>buyer</td><td>Inicia el cobro (<code>Idempotency-Key</code> obligatoria). 201 o 200; nunca dos cobros pendientes a la vez. 409 <code>ORDER_NOT_PAYABLE</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders/:id/payments</code></td><td>buyer</td><td>Pagos del pedido con sus reembolsos (comprobante)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/payments/webhook/placeholder</code></td><td>proveedor</td><td><code>{"eventId","type":"payment.captured"|"payment.failed","providerRef"}</code>. Capturado: pedido <code>paid</code> y reserva convertida en venta. Fallido: el pedido sigue pendiente para reintentar. Repetido: <code>duplicate</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders/:id/payments</code></td><td>seller</td><td>Pagos y reembolsos del pedido</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/orders/:id/refunds</code></td><td>seller</td><td><code>{"amount":400,"reason":"…"}</code>; sin <code>amount</code> reembolsa lo que falta. Nunca supera lo cobrado (400 <code>INVALID_AMOUNT</code>, 409 <code>REFUND_EXCEEDS_PAYMENT</code>); el total de un pedido sin completar se hace cancelándolo (409 <code>USE_CANCEL</code>)</td></tr></table>
+
 <h2 id="flujos">Flujos de auth</h2>
 <h3>A. Comprador</h3>
 <div class="flow">
@@ -285,19 +307,26 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <tr><td class="err">401</td><td>Credenciales incorrectas, o sin token válido en rutas protegidas</td><td><code>INVALID_EMAIL_OR_PASSWORD</code> (auth) · <code>{"error":{…,"code":"UNAUTHORIZED"}}</code></td></tr>
   <tr><td class="err">403</td><td>Rol insuficiente (<code>requireRole</code>), login por la ruta del otro rol, vendedor sin tienda</td><td><code>FORBIDDEN</code> · <code>WRONG_ROLE</code> · <code>ORGANIZATION_REQUIRED</code> · <code>STORE_REQUIRED</code></td></tr>
   <tr><td class="err">404</td><td>Ruta inexistente, o ruta genérica de registro/login cerrada</td><td><code>NOT_FOUND</code> · <code>ENDPOINT_MOVED</code></td></tr>
-  <tr><td class="err">409</td><td>Identificación fiscal repetida, o nombre de sucursal repetido en la organización</td><td><code>TAX_ID_ALREADY_EXISTS</code> · <code>STORE_NAME_ALREADY_EXISTS</code></td></tr>
+  <tr><td class="err">409</td><td>Conflicto de datos o de estado</td><td><code>TAX_ID_ALREADY_EXISTS</code> · <code>LEGAL_ID_ALREADY_EXISTS</code> · <code>SKU_ALREADY_EXISTS</code> · <code>CATEGORY_SLUG_EXISTS</code> · <code>DISCOUNT_OVERLAP</code> · <code>INSUFFICIENT_STOCK</code> · <code>CART_OTHER_STORE</code> · <code>ITEM_UNAVAILABLE</code> · <code>INVALID_TRANSITION</code> · <code>ORDER_NOT_PAYABLE</code> · <code>REFUND_EXCEEDS_PAYMENT</code> · <code>USE_CANCEL</code> · <code>IMAGE_LIMIT</code></td></tr>
+  <tr><td class="err">413</td><td>Imagen de más de 5 MB</td><td><code>IMAGE_TOO_LARGE</code></td></tr>
   <tr><td class="err">422</td><td>Correo ya registrado</td><td><code>USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL</code></td></tr>
   <tr><td class="err">429</td><td>Demasiadas peticiones</td><td>rutas por rol: <code>{"error":{…,"code":"RATE_LIMITED"}}</code> · rutas de Better Auth: <code>{"message":"Too many requests…"}</code> y cabecera <code>x-retry-after</code></td></tr>
   <tr><td class="err">500</td><td>Fallo interno</td><td><code>{"error":{"message","code":"INTERNAL_ERROR"}}</code> (en producción el mensaje es genérico)</td></tr>
 </table>
 
 <h2 id="limites">Rate limiting</h2>
-<p>Por IP, ventana de 60 s, activo en todos los entornos. Los contadores están en memoria (se reinician con el servidor). Si la API va detrás de un proxy, hay que configurar <code>trust proxy</code> en Express y las cabeceras de IP de confianza en Better Auth; si no, el límite puede falsearse o aplicarse a la IP del proxy.</p>
+<p>Por IP, ventana de 60 s, activo en todos los entornos. Los contadores están en memoria (se reinician con el servidor). Si la API va detrás de un proxy, hay que definir <code>TRUST_PROXY</code> (número de proxies; configura <code>trust proxy</code> y la IP de Better Auth) en Express y las cabeceras de IP de confianza en Better Auth; si no, el límite puede falsearse o aplicarse a la IP del proxy.</p>
 <table>
   <tr><th>Ruta</th><th>Máx. / minuto</th><th>Quién lo aplica</th></tr>
   <tr><td><code>/auth/buyer/*</code> y <code>/auth/seller/*</code> (cada ruta por separado)</td><td>5</td><td><code>express-rate-limit</code> (código propio)</td></tr>
   <tr><td><code>/auth/email-otp/send-verification-otp</code></td><td>3</td><td>Better Auth</td></tr>
   <tr><td><code>/auth/email-otp/verify-email</code></td><td>5</td><td>Better Auth</td></tr>
+  <tr><td><code>/auth/email-otp/request-password-reset</code></td><td>3</td><td>Better Auth</td></tr>
+  <tr><td><code>/auth/email-otp/reset-password</code></td><td>5</td><td>Better Auth</td></tr>
+  <tr><td>Toda la API propia (<code>/api/v1/*</code>): lecturas / escrituras</td><td>600 / 120</td><td><code>express-rate-limit</code>, por token de sesión o IP</td></tr>
+  <tr><td><code>POST /orders</code>, <code>POST /orders/:id/pay</code></td><td>10</td><td><code>express-rate-limit</code></td></tr>
+  <tr><td><code>POST /seller/items/:id/images</code></td><td>20</td><td><code>express-rate-limit</code></td></tr>
+  <tr><td><code>POST /payments/webhook/placeholder</code></td><td>300</td><td><code>express-rate-limit</code></td></tr>
   <tr><td>resto de <code>/auth/*</code></td><td>100</td><td>Better Auth</td></tr>
 </table>
 
@@ -323,10 +352,12 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <tr><td><code>src/middlewares/auth.js</code></td><td><code>requireAuth</code> y <code>requireRole</code></td></tr>
   <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugins <code>bearer</code> y <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
   <tr><td><code>src/mail/index.js</code></td><td>Transport de correo: consola (dev/test, guarda en <code>outbox</code>) o Resend (producción)</td></tr>
-  <tr><td><code>src/db/</code></td><td>Conexión (<code>index.js</code>) y esquema generado (<code>schema.js</code>)</td></tr>
-  <tr><td><code>src/db/business.js</code></td><td>Tablas <code>organization</code> y <code>store</code> (propias, aparte del esquema generado)</td></tr>
-  <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
-  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code>, <code>me.test.js</code>, <code>sellers.test.js</code></td></tr>
+  <tr><td><code>src/db/index.js</code></td><td>Conexión y unión de los esquemas</td></tr>
+    <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
+  <tr><td><code>src/services/</code> (marketplace)</td><td><code>categoryService</code>, <code>itemService</code>, <code>imageService</code>, <code>pricingService</code> (descuentos, totales, comisión), <code>stockService</code> (movimientos, reservas), <code>cartService</code>, <code>orderService</code>, <code>orderStateMachine</code>, <code>paymentService</code>, <code>paymentCore</code></td></tr>
+  <tr><td><code>src/payments/</code></td><td>Adaptador del proveedor de pago (<code>placeholder.js</code>): <code>createPayment</code>, <code>refund</code>, <code>verifyWebhook</code></td></tr>
+  <tr><td><code>src/db/*.js</code></td><td><code>business.js</code>, <code>catalog.js</code>, <code>inventory.js</code>, <code>orders.js</code>, <code>payments.js</code> (propias) y <code>schema.js</code> (generado)</td></tr>
+  <tr><td><code>test/</code></td><td><code>api</code>, <code>db</code>, <code>auth</code>, <code>me</code>, <code>sellers</code>, <code>profile</code>, <code>catalog</code>, <code>inventory</code>, <code>orders</code>, <code>payments</code> (<code>*.test.js</code>) y <code>helpers.js</code></td></tr>
 </table>
 
 <h3>Cómo añadir un endpoint propio</h3>
@@ -339,231 +370,17 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 </ol>
 
 <h3 id="modelo">Modelo relacional</h3>
-<p>PostgreSQL, 6 tablas en dos grupos. <strong>Autenticación</strong> (azul) guarda quién es el usuario y cómo entra; <strong>Negocio</strong> (verde) guarda lo que hace un vendedor: su <code>organization</code> (datos legales; representa a un usuario <code>seller</code>) y las sucursales (<code>store</code>) de esa organización. Comprador y vendedor comparten <code>user</code>, y el campo <code>role</code> (<code>buyer</code> o <code>seller</code>, no nulo) los distingue.</p>
-<svg viewBox="0 0 880 600" role="img" aria-label="Diagrama entidad-relación agrupado en autenticación y negocio" class="er">
-<rect x="10" y="10" width="636" height="570" rx="14" class="grp ga"/><text x="26" y="34" class="gt">AUTENTICACIÓN</text><text x="26" y="48" class="gs">quién es el usuario y cómo entra</text>
-<rect x="656" y="10" width="214" height="570" rx="14" class="grp gb"/><text x="672" y="34" class="gt">NEGOCIO</text><text x="672" y="48" class="gs">organización y sucursales</text>
-<path d="M224 268 V290 H120 V312" class="rel"/>
-<path d="M224 268 V290 H328 V312" class="rel"/>
-<text x="230" y="283" class="card">1</text>
-<text x="126" y="306" class="card">N</text>
-<text x="334" y="306" class="card">N</text>
-<path d="M324 125 H664" class="rel"/>
-<text x="330" y="119" class="card">1</text>
-<text x="648" y="119" class="card" text-anchor="end">0..1</text>
-<path d="M763 268 V312" class="rel"/>
-<text x="771" y="284" class="card">1</text>
-<text x="771" y="306" class="card">N</text>
-<g class="et">
-<rect x="124" y="62" width="200" height="206" rx="8" class="eb"/>
-<path d="M124 92 V70 a8 8 0 0 1 8 -8 H316 a8 8 0 0 1 8 8 V92 Z" class="eh"/>
-<text x="136" y="82" class="en">user</text>
-<text x="134" y="107" class="ec pk">id</text>
-<text x="248" y="107" class="et2">text</text>
-<text x="316" y="107" class="tg" text-anchor="end">PK</text>
-<line x1="124" y1="114" x2="324" y2="114" class="el"/>
-<text x="134" y="129" class="ec">name</text>
-<text x="248" y="129" class="et2">text</text>
-<text x="316" y="129" class="tg" text-anchor="end">NN</text>
-<line x1="124" y1="136" x2="324" y2="136" class="el"/>
-<text x="134" y="151" class="ec">email</text>
-<text x="248" y="151" class="et2">text</text>
-<text x="316" y="151" class="tg" text-anchor="end">UK</text>
-<line x1="124" y1="158" x2="324" y2="158" class="el"/>
-<text x="134" y="173" class="ec">email_verified</text>
-<text x="248" y="173" class="et2">bool</text>
-<line x1="124" y1="180" x2="324" y2="180" class="el"/>
-<text x="134" y="195" class="ec">image</text>
-<text x="248" y="195" class="et2">text</text>
-<line x1="124" y1="202" x2="324" y2="202" class="el"/>
-<text x="134" y="217" class="ec">role</text>
-<text x="248" y="217" class="et2">text</text>
-<text x="316" y="217" class="tg" text-anchor="end">NN</text>
-<line x1="124" y1="224" x2="324" y2="224" class="el"/>
-<text x="134" y="239" class="ec">created_at</text>
-<text x="248" y="239" class="et2">timestamp</text>
-<line x1="124" y1="246" x2="324" y2="246" class="el"/>
-<text x="134" y="261" class="ec">updated_at</text>
-<text x="248" y="261" class="et2">timestamp</text>
-</g>
-<g class="et">
-<rect x="20" y="312" width="200" height="206" rx="8" class="eb"/>
-<path d="M20 342 V320 a8 8 0 0 1 8 -8 H212 a8 8 0 0 1 8 8 V342 Z" class="eh"/>
-<text x="32" y="332" class="en">session</text>
-<text x="30" y="357" class="ec pk">id</text>
-<text x="144" y="357" class="et2">text</text>
-<text x="212" y="357" class="tg" text-anchor="end">PK</text>
-<line x1="20" y1="364" x2="220" y2="364" class="el"/>
-<text x="30" y="379" class="ec fk">user_id</text>
-<text x="144" y="379" class="et2">text</text>
-<text x="212" y="379" class="tg" text-anchor="end">FK</text>
-<line x1="20" y1="386" x2="220" y2="386" class="el"/>
-<text x="30" y="401" class="ec">token</text>
-<text x="144" y="401" class="et2">text</text>
-<text x="212" y="401" class="tg" text-anchor="end">UK</text>
-<line x1="20" y1="408" x2="220" y2="408" class="el"/>
-<text x="30" y="423" class="ec">expires_at</text>
-<text x="144" y="423" class="et2">timestamp</text>
-<line x1="20" y1="430" x2="220" y2="430" class="el"/>
-<text x="30" y="445" class="ec">ip_address</text>
-<text x="144" y="445" class="et2">text</text>
-<line x1="20" y1="452" x2="220" y2="452" class="el"/>
-<text x="30" y="467" class="ec">user_agent</text>
-<text x="144" y="467" class="et2">text</text>
-<line x1="20" y1="474" x2="220" y2="474" class="el"/>
-<text x="30" y="489" class="ec">created_at</text>
-<text x="144" y="489" class="et2">timestamp</text>
-<line x1="20" y1="496" x2="220" y2="496" class="el"/>
-<text x="30" y="511" class="ec">updated_at</text>
-<text x="144" y="511" class="et2">timestamp</text>
-</g>
-<g class="et">
-<rect x="228" y="312" width="200" height="250" rx="8" class="eb"/>
-<path d="M228 342 V320 a8 8 0 0 1 8 -8 H420 a8 8 0 0 1 8 8 V342 Z" class="eh"/>
-<text x="240" y="332" class="en">account</text>
-<text x="238" y="357" class="ec pk">id</text>
-<text x="352" y="357" class="et2">text</text>
-<text x="420" y="357" class="tg" text-anchor="end">PK</text>
-<line x1="228" y1="364" x2="428" y2="364" class="el"/>
-<text x="238" y="379" class="ec fk">user_id</text>
-<text x="352" y="379" class="et2">text</text>
-<text x="420" y="379" class="tg" text-anchor="end">FK</text>
-<line x1="228" y1="386" x2="428" y2="386" class="el"/>
-<text x="238" y="401" class="ec">provider_id</text>
-<text x="352" y="401" class="et2">text</text>
-<line x1="228" y1="408" x2="428" y2="408" class="el"/>
-<text x="238" y="423" class="ec">account_id</text>
-<text x="352" y="423" class="et2">text</text>
-<line x1="228" y1="430" x2="428" y2="430" class="el"/>
-<text x="238" y="445" class="ec">password</text>
-<text x="352" y="445" class="et2">text</text>
-<text x="420" y="445" class="tg" text-anchor="end">hash</text>
-<line x1="228" y1="452" x2="428" y2="452" class="el"/>
-<text x="238" y="467" class="ec">access_token</text>
-<text x="352" y="467" class="et2">text</text>
-<line x1="228" y1="474" x2="428" y2="474" class="el"/>
-<text x="238" y="489" class="ec">refresh_token</text>
-<text x="352" y="489" class="et2">text</text>
-<line x1="228" y1="496" x2="428" y2="496" class="el"/>
-<text x="238" y="511" class="ec">id_token</text>
-<text x="352" y="511" class="et2">text</text>
-<line x1="228" y1="518" x2="428" y2="518" class="el"/>
-<text x="238" y="533" class="ec">scope</text>
-<text x="352" y="533" class="et2">text</text>
-<line x1="228" y1="540" x2="428" y2="540" class="el"/>
-<text x="238" y="555" class="ec">… +4 columnas</text>
-</g>
-<g class="et dashed">
-<rect x="436" y="312" width="200" height="162" rx="8" class="eb"/>
-<path d="M436 342 V320 a8 8 0 0 1 8 -8 H628 a8 8 0 0 1 8 8 V342 Z" class="eh"/>
-<text x="448" y="332" class="en">verification</text>
-<text x="446" y="357" class="ec pk">id</text>
-<text x="560" y="357" class="et2">text</text>
-<text x="628" y="357" class="tg" text-anchor="end">PK</text>
-<line x1="436" y1="364" x2="636" y2="364" class="el"/>
-<text x="446" y="379" class="ec">identifier</text>
-<text x="560" y="379" class="et2">text</text>
-<line x1="436" y1="386" x2="636" y2="386" class="el"/>
-<text x="446" y="401" class="ec">value</text>
-<text x="560" y="401" class="et2">text</text>
-<text x="628" y="401" class="tg" text-anchor="end">hash</text>
-<line x1="436" y1="408" x2="636" y2="408" class="el"/>
-<text x="446" y="423" class="ec">expires_at</text>
-<text x="560" y="423" class="et2">timestamp</text>
-<line x1="436" y1="430" x2="636" y2="430" class="el"/>
-<text x="446" y="445" class="ec">created_at</text>
-<text x="560" y="445" class="et2">timestamp</text>
-<line x1="436" y1="452" x2="636" y2="452" class="el"/>
-<text x="446" y="467" class="ec">updated_at</text>
-<text x="560" y="467" class="et2">timestamp</text>
-</g>
-<g class="et">
-<rect x="664" y="62" width="198" height="206" rx="8" class="eb"/>
-<path d="M664 92 V70 a8 8 0 0 1 8 -8 H854 a8 8 0 0 1 8 8 V92 Z" class="eh"/>
-<text x="676" y="82" class="en">organization</text>
-<text x="674" y="107" class="ec pk">id</text>
-<text x="788" y="107" class="et2">text</text>
-<text x="854" y="107" class="tg" text-anchor="end">PK</text>
-<line x1="664" y1="114" x2="862" y2="114" class="el"/>
-<text x="674" y="129" class="ec fk">user_id</text>
-<text x="788" y="129" class="et2">text</text>
-<text x="854" y="129" class="tg" text-anchor="end">FK·UK</text>
-<line x1="664" y1="136" x2="862" y2="136" class="el"/>
-<text x="674" y="151" class="ec">legal_name</text>
-<text x="788" y="151" class="et2">text</text>
-<text x="854" y="151" class="tg" text-anchor="end">NN</text>
-<line x1="664" y1="158" x2="862" y2="158" class="el"/>
-<text x="674" y="173" class="ec">trade_name</text>
-<text x="788" y="173" class="et2">text</text>
-<line x1="664" y1="180" x2="862" y2="180" class="el"/>
-<text x="674" y="195" class="ec">tax_id</text>
-<text x="788" y="195" class="et2">text</text>
-<text x="854" y="195" class="tg" text-anchor="end">UK</text>
-<line x1="664" y1="202" x2="862" y2="202" class="el"/>
-<text x="674" y="217" class="ec">country</text>
-<text x="788" y="217" class="et2">text</text>
-<text x="854" y="217" class="tg" text-anchor="end">NN</text>
-<line x1="664" y1="224" x2="862" y2="224" class="el"/>
-<text x="674" y="239" class="ec">legal_address</text>
-<text x="788" y="239" class="et2">text</text>
-<text x="854" y="239" class="tg" text-anchor="end">NN</text>
-<line x1="664" y1="246" x2="862" y2="246" class="el"/>
-<text x="674" y="261" class="ec">… +3 columnas</text>
-</g>
-<g class="et">
-<rect x="664" y="312" width="198" height="206" rx="8" class="eb"/>
-<path d="M664 342 V320 a8 8 0 0 1 8 -8 H854 a8 8 0 0 1 8 8 V342 Z" class="eh"/>
-<text x="676" y="332" class="en">store</text>
-<text x="674" y="357" class="ec pk">id</text>
-<text x="802" y="357" class="et2">text</text>
-<text x="854" y="357" class="tg" text-anchor="end">PK</text>
-<line x1="664" y1="364" x2="862" y2="364" class="el"/>
-<text x="674" y="379" class="ec fk">organization_id</text>
-<text x="802" y="379" class="et2">text</text>
-<text x="854" y="379" class="tg" text-anchor="end">FK</text>
-<line x1="664" y1="386" x2="862" y2="386" class="el"/>
-<text x="674" y="401" class="ec">name</text>
-<text x="802" y="401" class="et2">text</text>
-<text x="854" y="401" class="tg" text-anchor="end">NN*</text>
-<line x1="664" y1="408" x2="862" y2="408" class="el"/>
-<text x="674" y="423" class="ec">description</text>
-<text x="802" y="423" class="et2">text</text>
-<line x1="664" y1="430" x2="862" y2="430" class="el"/>
-<text x="674" y="445" class="ec">address</text>
-<text x="802" y="445" class="et2">text</text>
-<text x="854" y="445" class="tg" text-anchor="end">NN</text>
-<line x1="664" y1="452" x2="862" y2="452" class="el"/>
-<text x="674" y="467" class="ec">city</text>
-<text x="802" y="467" class="et2">text</text>
-<text x="854" y="467" class="tg" text-anchor="end">NN</text>
-<line x1="664" y1="474" x2="862" y2="474" class="el"/>
-<text x="674" y="489" class="ec">phone</text>
-<text x="802" y="489" class="et2">text</text>
-<line x1="664" y1="496" x2="862" y2="496" class="el"/>
-<text x="674" y="511" class="ec">… +2 columnas</text>
-</g>
-<text x="436" y="492" class="note-t">sin FK: se enlaza por correo</text><text x="436" y="508" class="note-t">identifier = tipo-otp-correo</text><text x="664" y="534" class="note-t">* nombre único por organización</text>
-</svg>
-<div class="legend"><span><strong style="color:var(--accent)">PK</strong> clave primaria</span><span><strong style="color:var(--warn)">FK</strong> clave foránea</span><span><strong>UK</strong> único</span><span><strong>NN</strong> no nulo</span><span>Línea punteada: relación lógica, sin FK</span></div>
+<p>PostgreSQL, 20 tablas. El diagrama entidad-relación completo, con columnas y reglas de cada tabla, está en <a href="requirements.html#er"><code>requirements.html</code></a>. Los ids son numéricos (identity); dinero en <code>bigint</code> de unidades menores.</p>
 <table>
-  <tr><th>Relación</th><th>Cardinalidad</th><th>Detalle</th></tr>
-  <tr><td><code>user</code> → <code>session</code></td><td>1 a N</td><td><code>session.user_id</code>, cascada. Un usuario puede tener varias sesiones (varios dispositivos). El <code>token</code> es único.</td></tr>
-  <tr><td><code>user</code> → <code>account</code></td><td>1 a N</td><td><code>account.user_id</code>, cascada. Una fila por método de acceso; con contraseña, <code>provider_id = credential</code> y <code>password</code> guarda el hash.</td></tr>
-  <tr><td><code>user</code> → <code>organization</code></td><td>1 a 0..1</td><td><code>organization.user_id</code>, único y cascada. Todo <code>seller</code> tiene exactamente una organización (se crea en su registro); un <code>buyer</code> no tiene ninguna. Esa regla la aplica la API, no la base de datos.</td></tr>
-  <tr><td><code>organization</code> → <code>store</code></td><td>1 a N</td><td><code>store.organization_id</code>, cascada. Una organización tiene una o más sucursales (la primera se crea en el registro; el resto con <code>POST /stores</code>). El nombre de la sucursal es único dentro de su organización.</td></tr>
-  <tr><td><code>verification</code></td><td>sin FK</td><td>Códigos de un solo uso. <code>identifier</code> tiene la forma <code>tipo-otp-correo</code> (por ejemplo <code>sign-in-otp-ana@ejemplo.com</code>) y <code>value</code> guarda el hash del código.</td></tr>
+  <tr><th>Grupo</th><th>Tablas</th><th>Definidas en</th></tr>
+  <tr><td>Autenticación</td><td><code>user</code> (con <code>role</code> y <code>phone</code>), <code>session</code>, <code>account</code>, <code>verification</code></td><td><code>src/db/schema.js</code> (generado con <code>npm run auth:schema</code>)</td></tr>
+  <tr><td>Organización</td><td><code>organization</code> (1:1 con el usuario), <code>store</code> (1:1 con la organización; moneda, ubicación)</td><td><code>src/db/business.js</code></td></tr>
+  <tr><td>Catálogo</td><td><code>category</code> (por sucursal), <code>item</code> (con <code>current_stock</code>), <code>item_discount</code>, <code>item_image</code></td><td><code>src/db/catalog.js</code></td></tr>
+  <tr><td>Inventario</td><td><code>stock_movement</code> (libro, solo inserciones), <code>stock_reservation</code></td><td><code>src/db/inventory.js</code></td></tr>
+  <tr><td>Pedidos</td><td><code>cart</code>, <code>cart_item</code>, <code>order</code>, <code>order_item</code>, <code>order_status_history</code></td><td><code>src/db/orders.js</code></td></tr>
+  <tr><td>Pagos</td><td><code>payment</code>, <code>payment_event</code>, <code>refund</code></td><td><code>src/db/payments.js</code></td></tr>
 </table>
-<h3>Tablas y archivos</h3>
-<table>
-  <tr><th>Grupo</th><th>Tabla</th><th>Para qué</th><th>Índices y restricciones</th><th>Definida en</th></tr>
-  <tr><td>Autenticación</td><td><code>user</code></td><td>Cuenta</td><td>email único; <code>role</code> por defecto <code>buyer</code>, no nulo</td><td><code>src/db/schema.js</code> (generado)</td></tr>
-  <tr><td>Autenticación</td><td><code>session</code></td><td>Sesiones</td><td>token único; índice en <code>user_id</code></td><td><code>src/db/schema.js</code> (generado)</td></tr>
-  <tr><td>Autenticación</td><td><code>account</code></td><td>Credenciales e identidades</td><td>índice en <code>user_id</code></td><td><code>src/db/schema.js</code> (generado)</td></tr>
-  <tr><td>Autenticación</td><td><code>verification</code></td><td>Códigos de un solo uso</td><td>índice en <code>identifier</code></td><td><code>src/db/schema.js</code> (generado)</td></tr>
-  <tr><td>Negocio</td><td><code>organization</code></td><td>Datos legales del vendedor</td><td><code>user_id</code> y <code>tax_id</code> únicos, ambos no nulos</td><td><code>src/db/business.js</code> (propio)</td></tr>
-  <tr><td>Negocio</td><td><code>store</code></td><td>Sucursal: dirección, ciudad, teléfono</td><td>único (<code>organization_id</code>, <code>name</code>)</td><td><code>src/db/business.js</code> (propio)</td></tr>
-</table>
-<p>El esquema se genera desde la configuración de auth (<code>npm run auth:schema</code>) y se migra con Drizzle (<code>npm run db:generate</code> y <code>npm run db:migrate</code>).</p>
+<p>El esquema de auth se genera desde la configuración de Better Auth (<code>npm run auth:schema</code>) y todo se migra con Drizzle (<code>npm run db:generate</code> y <code>npm run db:migrate</code>). El generador de ids de Better Auth es <code>serial</code> (<code>advanced.database.generateId</code>).</p>
 
 <h3>Decisiones de diseño</h3>
 <ul>
@@ -572,14 +389,20 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <li><strong>Sin registro por código:</strong> las cuentas solo nacen en <code>/auth/buyer/sign-up</code> y <code>/auth/seller/sign-up</code>.</li>
   <li><strong>Sesión móvil:</strong> token de sesión opaco y revocable de Better Auth, no JWT con refresh.</li>
   <li><strong>Envío de correo sin <code>await</code>:</strong> evita diferencias de tiempo que revelen si un correo existe.</li>
+  <li><strong>Una sucursal por organización</strong> en el MVP (UNIQUE en <code>store.organization_id</code>); todo se trata como una sola tienda por vendedor.</li>
+  <li><strong>Stock:</strong> <code>current_stock</code> + libro de movimientos + reservas con vencimiento; los ítems se bloquean (<code>FOR UPDATE</code>) en orden para evitar interbloqueos y sobreventa.</li>
+  <li><strong>Un carrito = una sucursal = un pedido.</strong> Idempotencia por comprador (<code>Idempotency-Key</code>) en checkout y por pedido en pagos.</li>
+  <li><strong>Pagos:</strong> proveedor placeholder tras una interfaz de adaptador; la lógica de idempotencia, reservas y reembolsos es real.</li>
+  <li><strong>Sin rol admin:</strong> el usuario de la organización administra su catálogo, categorías, stock y pedidos.</li>
 </ul>
 
 <h2 id="pendiente">Pendiente</h2>
 <table>
-  <tr><th>Fase</th><th>Qué falta</th></tr>
-  <tr><td>—</td><td>Ítems por sucursal (tabla y endpoints); ver, editar y borrar organización y sucursales; pedidos</td></tr>
-  <tr><td>—</td><td>Unificar el formato de error de las rutas compartidas de Better Auth con el resto</td></tr>
-  <tr><td>—</td><td>Resend con API key real, recuperación de contraseña, rate limit compartido, proxy de confianza para IP</td></tr>
+  <tr><th>Tema</th><th>Qué falta</th></tr>
+  <tr><td>Pagos</td><td>Elegir proveedor real y reemplazar el adaptador placeholder; liquidación al seller y conciliación</td></tr>
+  <tr><td>Producto</td><td>Notificaciones, auditoría, variantes de ítem, importación CSV, aviso de stock bajo, eliminar cuenta</td></tr>
+  <tr><td>Operación</td><td>Imágenes en un bucket (hoy disco local), rate limit compartido (Redis), proxy de confianza para IP, Resend con API key real</td></tr>
+  <tr><td>Consistencia</td><td>Unificar el formato de error de las rutas compartidas de Better Auth; definir quién absorbe la comisión; datos legales definitivos de la organización</td></tr>
 </table>
 
 <footer>Generado a partir del estado actual del código y de respuestas reales del servidor local. Detalle del avance en <code>progress.md</code> y decisiones en <code>auth-options.md</code>.</footer>
