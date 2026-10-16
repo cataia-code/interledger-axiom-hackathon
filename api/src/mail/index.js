@@ -11,7 +11,7 @@ export function createConsoleTransport({ env }) {
     async send(message) {
       outbox.push(message);
       if (outbox.length > 100) outbox.shift();
-      if (env === 'production') console.log(`[mail] (not delivered, RESEND_API_KEY is not set) to=${message.to} subject="${message.subject}"`);
+      if (env === 'production') console.log(`[mail] (not delivered: no mail provider configured) to=${message.to} subject="${message.subject}"`);
       else if (env !== 'test') console.log(`[mail] to=${message.to} subject="${message.subject}"\n${message.text}`);
     },
   };
@@ -29,13 +29,45 @@ export function createResendTransport({ apiKey, from, client = new Resend(apiKey
   };
 }
 
-export function createMailer({ env = config.env, apiKey = config.resendApiKey, from = config.mailFrom, client } = {}) {
-  return env === 'production' && apiKey ? createResendTransport({ apiKey, from, client }) : createConsoleTransport({ env });
+// "Nombre <correo@dominio>" o solo "correo@dominio" -> { name, email }.
+export function parseFrom(from) {
+  const m = /^\s*(?:"?([^"<]*?)"?\s*)?<([^>]+)>\s*$/.exec(from);
+  return m ? { name: m[1]?.trim() || undefined, email: m[2].trim() } : { email: from.trim() };
+}
+
+// Brevo (plan gratuito: unos 300 correos al día) por su API HTTPS. No exige dominio propio: basta verificar
+// el correo remitente en Brevo. Se usa HTTPS y no SMTP porque muchos hosts bloquean el SMTP saliente.
+export function createBrevoTransport({ apiKey, from, fetchImpl = fetch }) {
+  const sender = parseFrom(from);
+  return {
+    name: 'brevo',
+    async send({ to, subject, text, html }) {
+      const res = await fetchImpl('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
+        headers: { 'api-key': apiKey, 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ sender, to: [{ email: to }], subject, textContent: text, htmlContent: html }),
+      });
+      const body = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(`Brevo error ${res.status}: ${body.code ?? 'unknown'}: ${body.message ?? 'request failed'}`);
+      return body;
+    },
+  };
+}
+
+// Elige el transport: MAIL_PROVIDER manda; si no, Brevo con BREVO_API_KEY, luego Resend con RESEND_API_KEY, y si no, consola.
+export function createMailer({ env = config.env, resendApiKey = config.resendApiKey, brevoApiKey = config.brevoApiKey, provider = config.mailProvider, from = config.mailFrom, client, fetchImpl } = {}) {
+  if (env !== 'production') return createConsoleTransport({ env });
+  const choice = provider || (brevoApiKey ? 'brevo' : resendApiKey ? 'resend' : 'console');
+  if (choice === 'brevo' && brevoApiKey) return createBrevoTransport({ apiKey: brevoApiKey, from, fetchImpl });
+  if (choice === 'resend' && resendApiKey) return createResendTransport({ apiKey: resendApiKey, from, client });
+  return createConsoleTransport({ env });
 }
 
 export const mailer = createMailer();
-if (config.env === 'production' && mailer.name !== 'resend') {
-  console.warn('[mail] RESEND_API_KEY is not set: emails (including login and verification codes) will NOT be delivered');
+if (config.env === 'production' && mailer.name === 'console') {
+  console.warn('[mail] no mail provider configured (set BREVO_API_KEY or RESEND_API_KEY): emails, including login and verification codes, will NOT be delivered');
+} else if (config.env === 'production') {
+  console.log(`[mail] sending through ${mailer.name}`);
 }
 
 const subjects = {
