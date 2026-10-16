@@ -32,6 +32,8 @@ export const config = {
   databaseUrl: process.env.DATABASE_URL ?? 'postgres://axiom:axiom@localhost:5432/axiom',
   authSecret: process.env.BETTER_AUTH_SECRET,
   resendApiKey: process.env.RESEND_API_KEY,
+  brevoApiKey: process.env.BREVO_API_KEY,
+  mailProvider: process.env.MAIL_PROVIDER, // brevo | resend; vacío = automático
   mailFrom: process.env.MAIL_FROM ?? 'Axiom <onboarding@resend.dev>',
   roleAuthRateLimitMax: process.env.NODE_ENV === 'test' ? 1000 : 5,
   uploadDir: process.env.UPLOAD_DIR ?? (process.env.NODE_ENV === 'test' ? path.join(os.tmpdir(), 'axiom-uploads-test') : path.resolve('uploads')),
