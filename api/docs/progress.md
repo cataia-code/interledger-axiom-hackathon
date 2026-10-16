@@ -38,13 +38,19 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - `test/auth.test.js` (8 pruebas HTTP con supertest contra Postgres real). El script `npm test` ahora fija `NODE_ENV=test`.
 - Verificación manual con `curl` contra el servidor en marcha: registro solo con código, y cuenta sin verificar + login con código.
 
+### Fase 3: sesión móvil y autorización
+- Plugin `bearer`: el `token` que devuelven el registro y el login (o la cabecera `set-auth-token`, firmado) se envía en `Authorization: Bearer <token>`.
+- `src/middlewares/auth.js`: `requireAuth` (401 `UNAUTHORIZED` si no hay sesión válida; deja `req.auth`) y `requireRole(...roles)` (403 `FORBIDDEN`).
+- `GET /api/v1/me` (protegido): `{ user: { id, email, name, role, emailVerified } }`. Está en `/api/v1/me` y no en `/api/v1/auth/me` porque `/api/v1/auth/*` lo atiende Better Auth.
+- `POST /api/v1/auth/sign-out` con el token lo revoca (después `/me` da 401).
+- `test/me.test.js`: 5 pruebas (token crudo y firmado, sin token o inválido, sign-out, `requireRole` con buyer y seller). `npm test`: 18/18.
+
 ## No hecho
 
 - Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
 - Recuperación de contraseña (los endpoints existen en el plugin pero no están probados ni se envía un correo específico).
 - Almacén de rate limit compartido: hoy es en memoria (se reinicia con el servidor y no sirve con varias instancias).
 - Detrás de un proxy hay que configurar `advanced.ipAddress` (cabeceras de confianza); si no, el límite por IP puede falsearse con `X-Forwarded-For`.
-- Fase 3: plugin `bearer` para la sesión móvil, `requireAuth`, `requireRole`, `GET /api/v1/auth/me`.
 - Fase 5: tabla `stores` y `POST /api/v1/stores` (el usuario pasa a `seller`).
 - Pagos, pedidos, frontend/app móvil y despliegue quedan fuera de alcance.
 

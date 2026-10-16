@@ -55,7 +55,7 @@
 <div class="wrap">
 
 <h1>Axiom API</h1>
-<p class="sub">Estado actual de la API REST (fases 1 y 2, login simplificado a contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
+<p class="sub">Estado actual de la API REST (fases 1 a 3, login simplificado a contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
 <nav>
   <a href="#resumen">Resumen</a><a href="#arranque">Arranque</a><a href="#general">Convenciones</a>
   <a href="#endpoints">Endpoints</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
@@ -113,6 +113,16 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/ping</span></div>
   <p>Ruta de ejemplo del patrón route → controller → service. Devuelve un contador en memoria.</p>
   <pre><code>{"message":"pong","count":1}</code></pre>
+</div>
+
+<h3>Usuario autenticado</h3>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/me</span></div>
+  <p>Devuelve el usuario de la sesión. Requiere <code>Authorization: Bearer &lt;token&gt;</code>, con el <code>token</code> que devuelven el registro y el login (o la cabecera <code>set-auth-token</code>).</p>
+  <pre><code>curl localhost:3000/api/v1/me -H 'Authorization: Bearer &lt;token&gt;'
+200 {"user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
+401 {"error":{"message":"Authentication required","code":"UNAUTHORIZED"}}</code></pre>
+  <p>Está en <code>/api/v1/me</code> y no bajo <code>/auth</code>, porque <code>/api/v1/auth/*</code> lo atiende Better Auth.</p>
 </div>
 
 <h3>Autenticación <span class="pill">/api/v1/auth</span></h3>
@@ -176,7 +186,9 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 </div>
 
 <div class="card">
-  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/auth/get-session</span></div>
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/sign-out</span></div>
+  <p>Cierra la sesión y revoca el token (enviado en <code>Authorization: Bearer</code>, con cuerpo <code>{}</code>). Después, <code>/me</code> responde 401.</p>
+</div>
   <p>Devuelve la sesión actual o <code>null</code>. <strong class="warn">Todavía no acepta el token en <code>Authorization: Bearer</code></strong>: eso llega en la fase 3.</p>
 </div>
 
@@ -242,11 +254,12 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <tr><td><code>src/config/index.js</code></td><td>Lee variables de entorno (dotenv)</td></tr>
   <tr><td><code>src/routes/</code>, <code>controllers/</code>, <code>services/</code></td><td>Patrón route → controller → service (hoy health y ping)</td></tr>
   <tr><td><code>src/middlewares/errorHandler.js</code></td><td><code>HttpError</code>, 404 y manejador global</td></tr>
-  <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugin <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
+  <tr><td><code>src/middlewares/auth.js</code></td><td><code>requireAuth</code> y <code>requireRole</code></td></tr>
+  <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugins <code>bearer</code> y <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
   <tr><td><code>src/mail/index.js</code></td><td>Transport de correo: consola (dev/test, guarda en <code>outbox</code>) o Resend (producción)</td></tr>
   <tr><td><code>src/db/</code></td><td>Conexión (<code>index.js</code>) y esquema generado (<code>schema.js</code>)</td></tr>
   <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
-  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code></td></tr>
+  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code>, <code>me.test.js</code></td></tr>
 </table>
 
 <h3>Modelo de datos</h3>
@@ -269,8 +282,7 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 <h2 id="pendiente">Pendiente</h2>
 <table>
   <tr><th>Fase</th><th>Qué falta</th></tr>
-  <tr><td>3</td><td>Aceptar el token con <code>Authorization: Bearer</code> (plugin <code>bearer</code>), <code>requireAuth</code>, <code>requireRole</code> y <code>GET /auth/me</code></td></tr>
-  <tr><td>5</td><td>Tiendas: <code>POST /stores</code> y cambio de rol a <code>seller</code></td></tr>
+  <tr><td>4</td><td>Tiendas: <code>POST /stores</code> (con <code>requireAuth</code>) y cambio de rol a <code>seller</code></td></tr>
   <tr><td>—</td><td>Resend con API key real, recuperación de contraseña, rate limit compartido, proxy de confianza para IP</td></tr>
 </table>
 
