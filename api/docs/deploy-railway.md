@@ -35,9 +35,9 @@ Para el correo (códigos de acceso): `RESEND_API_KEY` y `MAIL_FROM`, ver la secc
 **Servicio Postgres:** plantilla de PostgreSQL de Railway con su volumen. La extensión `pg_trgm` la crea la migración `0006`.
 
 ## Correo (códigos de acceso)
-La API envía por correo los códigos de inicio de sesión, verificación y recuperación de contraseña (`src/mail/index.js`). En producción elige el proveedor así: `MAIL_PROVIDER` (`brevo` o `resend`) si está definida; si no, **Brevo** si existe `BREVO_API_KEY`, luego **Resend** si existe `RESEND_API_KEY`. Sin ninguno **no se entregan correos**: el arranque lo avisa en el log y los códigos no se imprimen.
+La API envía por correo los códigos de inicio de sesión, verificación y recuperación de contraseña (`src/mail/index.js`). En producción elige el proveedor así: `MAIL_PROVIDER` (`brevo`, `mailjet` o `resend`) si está definida; si no, el primero con credenciales: **Brevo** (`BREVO_API_KEY`), **Mailjet** (`MAILJET_API_KEY` y `MAILJET_SECRET_KEY`) o **Resend** (`RESEND_API_KEY`). Sin ninguno **no se entregan correos**: el arranque lo avisa en el log y los códigos no se imprimen.
 
-### Gratis y sin dominio propio: Brevo (recomendado)
+### Gratis y sin dominio propio: Brevo
 Plan gratuito de unos 300 correos al día. Solo hace falta verificar un correo remitente (por ejemplo, tu Gmail); no pide dominio. Se usa su API por HTTPS y no SMTP, porque Railway suele bloquear el SMTP saliente en los planes que no son Pro.
 
 1. Crea una cuenta gratuita en https://www.brevo.com.
@@ -48,6 +48,18 @@ Plan gratuito de unos 300 correos al día. Solo hace falta verificar un correo r
    - `MAIL_FROM=Axiom <tu-correo-verificado@gmail.com>` (debe ser exactamente el remitente verificado)
 
 Railway redespliega solo. Los mensajes de Gmail enviados así pueden caer en spam al principio; para producción real conviene un dominio propio.
+
+### Gratis y sin dominio propio: Mailjet (alternativa a Brevo)
+Plan gratuito de 200 correos al día (6 000 al mes). También por API HTTPS y también basta con validar un correo remitente.
+
+1. Crea una cuenta gratuita en https://www.mailjet.com.
+2. En *Account settings → Senders & domains → Add a sender address*, añade tu correo y confirma el enlace que Mailjet envía.
+3. En *Account settings → REST API → API Key Management (Master)*, copia la **API Key** y la **Secret Key**.
+4. En las variables del servicio de la API en Railway añade:
+   - `MAILJET_API_KEY=<API Key>`
+   - `MAILJET_SECRET_KEY=<Secret Key>`
+   - `MAIL_FROM=Axiom <tu-correo-validado>` (exactamente el remitente validado)
+   - `MAIL_PROVIDER=mailjet` (solo si también tienes `BREVO_API_KEY`)
 
 ### Resend
 Con un dominio verificado en https://resend.com/domains: `RESEND_API_KEY` y `MAIL_FROM=Axiom <no-reply@tudominio.com>`. Sin dominio, Resend solo permite enviar desde `onboarding@resend.dev` y únicamente al correo de la cuenta de Resend (sirve para pruebas).

@@ -90,3 +90,28 @@ test('parseFrom understands "Name <email>", quoted names and bare addresses', ()
   assert.deepEqual(parseFrom('"Axiom Market" <yo@gmail.com>'), { name: 'Axiom Market', email: 'yo@gmail.com' });
   assert.deepEqual(parseFrom('yo@gmail.com'), { email: 'yo@gmail.com' });
 });
+
+test('Mailjet (free plan, no own domain) sends with basic auth through its v3.1 API', async () => {
+  const f = fakeFetch(200, { Messages: [{ Status: 'success', To: [{ Email: 'ana@ejemplo.com' }] }] });
+  const mailer = createMailer({ env: 'production', mailjetApiKey: 'pub', mailjetSecretKey: 'sec', resendApiKey: 're_test', from: 'Axiom <yo@gmail.com>', fetchImpl: f.impl });
+  assert.equal(mailer.name, 'mailjet');
+  const { text, html } = renderOtpEmail({ otp: '482913', type: 'sign-in' });
+  await mailer.send({ to: 'ana@ejemplo.com', subject: 'Tu código', text, html, type: 'sign-in', otp: '482913' });
+  const { url, init } = f.calls[0];
+  assert.equal(url, 'https://api.mailjet.com/v3.1/send');
+  assert.equal(init.headers.authorization, `Basic ${Buffer.from('pub:sec').toString('base64')}`);
+  const msg = JSON.parse(init.body).Messages[0];
+  assert.deepEqual(msg.From, { Email: 'yo@gmail.com', Name: 'Axiom' });
+  assert.deepEqual(msg.To, [{ Email: 'ana@ejemplo.com' }]);
+  assert.match(msg.TextPart, /482913/);
+  assert.ok(!('otp' in msg));
+});
+
+test('Mailjet reports rejected messages even when the HTTP status is 2xx/4xx, and needs both keys', async () => {
+  const f = fakeFetch(400, { Messages: [{ Status: 'error', Errors: [{ ErrorCode: 'mj-0013', ErrorMessage: 'Sender not validated' }] }] });
+  const mailer = createMailer({ env: 'production', mailjetApiKey: 'pub', mailjetSecretKey: 'sec', fetchImpl: f.impl });
+  await assert.rejects(mailer.send({ to: 'a@b.co', subject: 's', text: 't', html: 'h' }), /Mailjet error 400: mj-0013: Sender not validated/);
+  assert.equal(createMailer({ env: 'production', mailjetApiKey: 'pub' }).name, 'console');
+  assert.equal(createMailer({ env: 'production', brevoApiKey: 'k', mailjetApiKey: 'pub', mailjetSecretKey: 'sec' }).name, 'brevo');
+  assert.equal(createMailer({ env: 'production', provider: 'mailjet', brevoApiKey: 'k', mailjetApiKey: 'pub', mailjetSecretKey: 'sec' }).name, 'mailjet');
+});
