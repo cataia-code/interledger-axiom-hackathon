@@ -1,0 +1,17 @@
+{
+  "name": "payments",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "pay": "tsx src/pay.ts"
+  },
+  "dependencies": {
+    "@interledger/open-payments": "^7.4.0",
+    "dotenv": "^17.2.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.0",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  }
+}
