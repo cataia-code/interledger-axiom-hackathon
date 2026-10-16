@@ -112,3 +112,9 @@ El login queda en contraseña + código por correo. La verificación del email e
 4. Roles y middleware de autorización.
 5. Google OIDC e identidades vinculadas.
 6. Perfil de tienda y relación comprador → vendedor (pedidos, sin pagos).
+
+### Login separado por rol
+Decidido: mismas tablas (`user`, `session`, `account`), rutas separadas `/auth/buyer/*` y `/auth/seller/*`, y cada login solo acepta su rol. El vendedor se registra con su tienda en un solo paso (nunca existe un seller sin tienda); se elimina el alta posterior `POST /stores`. Las cuentas solo se crean por los registros por rol (sin registro por código). Un correo no puede ser comprador y vendedor a la vez.
+
+### Organización y sucursales
+Decidido: entre `user` y `store` va una tabla `organization` con los datos legales (1:1 con el usuario seller). `store` pasa a ser una sucursal de la organización (dirección, ciudad, teléfono; llevará ítems). El registro de seller crea usuario + organización + primera sucursal en un solo paso; más sucursales se añaden con `POST /stores`. Los campos legales concretos (razón social, identificación fiscal, país, dirección) son provisionales y se ajustarán a los requisitos legales reales.

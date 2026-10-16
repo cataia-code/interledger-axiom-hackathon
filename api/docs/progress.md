@@ -45,20 +45,39 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - `POST /api/v1/auth/sign-out` con el token lo revoca (después `/me` da 401).
 - `test/me.test.js`: 5 pruebas (token crudo y firmado, sin token o inválido, sign-out, `requireRole` con buyer y seller). `npm test`: 18/18.
 
-### Fase 4: tiendas
-- Tabla `store` (id, user_id único con borrado en cascada, name, description, timestamps) en `src/db/stores.js`, separada de `schema.js` porque ese archivo lo regenera Better Auth. Migración `drizzle/0001_chilly_turbo.sql`; `drizzle.config.js` lee ambos archivos.
-- `POST /api/v1/stores` (requiere token): valida `name` (2-80 caracteres, obligatorio) y `description` (opcional, hasta 500), crea la tienda y pasa al usuario de `buyer` a `seller` en una sola transacción. Responde 201 con la tienda y el rol.
-- Un usuario solo puede tener una tienda: 409 `STORE_ALREADY_EXISTS`, también ante peticiones concurrentes (restricción única + transacción).
-- Código: `services/storeService.js`, `controllers/storeController.js`, ruta en `routes/index.js`.
-- `test/stores.test.js`: 7 pruebas (sin token, validación, creación y rol, descripción opcional, segunda tienda, concurrencia, borrado en cascada). `npm test`: 25/25.
+### Fase 4: tiendas (reemplazada por la fase 6)
+- Primera versión: tabla `store` ligada directamente al usuario y `POST /stores`. Ver fase 6.
+
+### Fase 5: login separado por rol (comprador / vendedor)
+- Rutas por rol bajo `/api/v1/auth`: `buyer/sign-up`, `buyer/sign-in`, `buyer/sign-in/otp`, `seller/sign-up`, `seller/sign-in`, `seller/sign-in/otp` (`src/routes/roleAuth.js`, `controllers/roleAuthController.js`, `services/roleAuthService.js`). Llaman a Better Auth por dentro y traducen sus errores al formato de la API.
+- Mismas tablas y sesiones; **cada login solo acepta su rol**: si el rol no coincide, 403 `WRONG_ROLE`, se revoca la sesión recién creada y no se devuelve token. El rol se comprueba después de validar la contraseña, para no revelar qué correos existen.
+- **El vendedor siempre tiene organización y sucursal** (ver fase 6): `seller/sign-up` crea todo junto y, si falla, borra el usuario.
+- Cerradas las rutas genéricas `POST /auth/sign-up/email`, `/auth/sign-in/email` y `/auth/sign-in/email-otp` (404 `ENDPOINT_MOVED`).
+- El login con código ya **no crea cuentas** (`disableSignUp: true`): solo se nace por los registros por rol.
+- Un comprador no puede convertirse en vendedor por su cuenta: no hay conversión (decidido: mismo correo no puede tener ambos roles).
+- Rate limit propio de las rutas por rol (`express-rate-limit`, 5/min por ruta e IP, 429 `RATE_LIMITED`), porque Better Auth no limita las llamadas internas.
+- Tests: `test/sellers.test.js` (registro de seller con tienda, validación sin residuos, correo existente, login por contraseña y código, cruce de roles, sesión revocada, mismo 401 para contraseña incorrecta y correo desconocido, seller sin tienda, rate limit, `/stores` inexistente); `auth.test.js` y `me.test.js` adaptados. `npm test`: 29/29.
+- Documentación: el modelo relacional del HTML agrupa las tablas en **Autenticación** (`user`, `session`, `account`, `verification`) y **Negocio** (`store`).
+
+### Fase 6: organización y sucursales
+- Nueva tabla intermedia `organization` entre `user` y `store`: datos legales del vendedor (`legal_name`, `trade_name`, `tax_id` único, `country` ISO de 2 letras, `legal_address`, `phone`), 1:1 con el usuario seller (`user_id` único, cascada).
+- `store` pasa a ser una **sucursal**: cuelga de `organization` (`organization_id`, cascada), con `address`, `city`, `phone` y `description`; nombre único dentro de la organización. Ya no tiene `user_id`.
+- Tablas propias en `src/db/business.js` (reemplaza a `stores.js`). Migraciones `0002` (elimina la `store` anterior) y `0003` (crea `organization` y la nueva `store`); se hicieron en dos pasos para evitar que drizzle-kit pregunte por renombres. Los datos de `store` anteriores se pierden (solo había datos de prueba).
+- `POST /auth/seller/sign-up` ahora recibe `organization` y `store`, valida todo antes de crear nada y crea usuario + organización + primera sucursal + rol `seller` (compensación: si falla, borra el usuario). `TAX_ID_ALREADY_EXISTS` (409) si la identificación fiscal ya existe.
+- `POST /api/v1/stores` vuelve, ahora solo para sellers (`requireAuth` + `requireRole('seller')`): añade una sucursal a su organización (409 `STORE_NAME_ALREADY_EXISTS` si repite nombre).
+- `seller/sign-in` exige organización y al menos una sucursal (403 `ORGANIZATION_REQUIRED` / `STORE_REQUIRED`).
+- Código: `services/storeService.js` (validaciones), `services/sellerService.js` (creación y consultas), `controllers/storeController.js`.
+- Tests: `test/sellers.test.js` ampliado. `npm test`: 32/32.
+- HTML: el diagrama del grupo Negocio muestra `organization` → `store`.
 
 ## No hecho
 
 - Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
 - Recuperación de contraseña (los endpoints existen en el plugin pero no están probados ni se envía un correo específico).
 - Almacén de rate limit compartido: hoy es en memoria (se reinicia con el servidor y no sirve con varias instancias).
-- Detrás de un proxy hay que configurar `advanced.ipAddress` (cabeceras de confianza); si no, el límite por IP puede falsearse con `X-Forwarded-For`.
-- Editar, ver o borrar tiendas (solo existe la creación), y tienda ↔ productos.
+- Detrás de un proxy hay que configurar `trust proxy` en Express y `advanced.ipAddress` en Better Auth; si no, el límite por IP se aplica a la IP del proxy.
+- Ítems por sucursal (tabla y endpoints); ver, editar o borrar organización y sucursales (solo existe la creación).
+- Unificar el formato de error de las rutas compartidas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`) con el del resto de la API.
 - Pagos, pedidos, frontend/app móvil y despliegue quedan fuera de alcance.
 
 ## Notas y desviaciones
@@ -66,7 +85,7 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - Simplificación pedida: el inicio de sesión queda en contraseña + código por correo. Verificación de email opcional (antes obligatoria) y login con Google fuera del plan (puede añadirse después sin cambiar el modelo).
 
 - **Limitación conocida (más probable ahora que la verificación es opcional):** iniciar sesión con código sobre una cuenta de contraseña **sin verificar** la verifica pero le borra la contraseña y revoca sus sesiones (comportamiento documentado de Better Auth contra el robo de cuentas). Después, el login con contraseña da 401 hasta restablecerla.
-- Iniciar sesión con código con un correo nuevo crea el usuario ya verificado con `name` vacío; falta decidir si se permite (hoy sí) o se pide nombre.
+- Iniciar sesión con código ya no crea usuarios: las cuentas solo nacen en `buyer/sign-up` y `seller/sign-up`.
 
 - Sesión móvil: se usará el token de sesión opaco y revocable de Better Auth (plugin `bearer`), **no** JWT de acceso + refresh rotativo como se pensó al inicio; Better Auth no ofrece refresh rotativo.
 - `@better-auth/cli` está obsoleto; se usó `auth@latest generate`.

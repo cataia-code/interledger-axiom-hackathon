@@ -1,24 +1,48 @@
-import { eq } from 'drizzle-orm';
-import { db } from '../db/index.js';
-import { user } from '../db/schema.js';
-import { store } from '../db/stores.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 
-const alreadyExists = () => new HttpError(409, 'The user already has a store', 'STORE_ALREADY_EXISTS');
+const bad = (message, code) => new HttpError(400, message, code);
+const str = (v) => (typeof v === 'string' ? v.trim() : '');
 
-// Crea la tienda del usuario y lo promueve a seller en una sola transacción.
-export async function createStore(userId, { name, description }) {
-  try {
-    return await db.transaction(async (tx) => {
-      const [existing] = await tx.select({ id: store.id }).from(store).where(eq(store.userId, userId));
-      if (existing) throw alreadyExists();
+function required(value, field, min, max, code) {
+  const v = str(value);
+  if (v.length < min || v.length > max) throw bad(`${field} must be between ${min} and ${max} characters`, code);
+  return v;
+}
 
-      const [created] = await tx.insert(store).values({ userId, name, description }).returning();
-      const [updated] = await tx.update(user).set({ role: 'seller' }).where(eq(user.id, userId)).returning();
-      return { store: created, role: updated.role };
-    });
-  } catch (err) {
-    if (err.code === '23505') throw alreadyExists(); // carrera: otra petición creó la tienda antes
-    throw err;
+function optional(value, field, max, code) {
+  if (value == null) return null;
+  if (typeof value !== 'string' || value.trim().length > max) {
+    throw bad(`${field} must be a string of at most ${max} characters`, code);
   }
+  return value.trim() || null;
+}
+
+const object = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
+
+// Datos legales de la organización.
+export function validateOrganizationInput(input) {
+  const b = object(input);
+  const legalName = required(b.legalName, 'organization.legalName', 2, 120, 'INVALID_LEGAL_NAME');
+  const country = str(b.country).toUpperCase();
+  if (!/^[A-Z]{2}$/.test(country)) throw bad('organization.country must be a 2-letter ISO code', 'INVALID_COUNTRY');
+  return {
+    legalName,
+    tradeName: optional(b.tradeName, 'organization.tradeName', 120, 'INVALID_TRADE_NAME'),
+    taxId: required(b.taxId, 'organization.taxId', 3, 40, 'INVALID_TAX_ID'),
+    country,
+    legalAddress: required(b.legalAddress, 'organization.legalAddress', 5, 200, 'INVALID_LEGAL_ADDRESS'),
+    phone: optional(b.phone, 'organization.phone', 30, 'INVALID_PHONE'),
+  };
+}
+
+// Datos de una sucursal.
+export function validateStoreInput(input) {
+  const b = object(input);
+  return {
+    name: required(b.name, 'store.name', 2, 80, 'INVALID_NAME'),
+    description: optional(b.description, 'store.description', 500, 'INVALID_DESCRIPTION'),
+    address: required(b.address, 'store.address', 5, 200, 'INVALID_ADDRESS'),
+    city: required(b.city, 'store.city', 2, 80, 'INVALID_CITY'),
+    phone: optional(b.phone, 'store.phone', 30, 'INVALID_PHONE'),
+  };
 }

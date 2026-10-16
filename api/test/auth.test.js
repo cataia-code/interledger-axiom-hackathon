@@ -29,44 +29,44 @@ after(async () => {
 });
 
 async function signUp(e = email()) {
-  const res = await post('/sign-up/email', { email: e, password: PASSWORD, name: 'Test' });
+  const res = await post('/buyer/sign-up', { email: e, password: PASSWORD, name: 'Test' });
   return { e, res };
 }
 
-test('sign-up logs the user in, sends a verification code and verification is optional', async () => {
+test('buyer sign-up logs the user in, sends a verification code and verification is optional', async () => {
   const { e, res } = await signUp();
-  assert.equal(res.status, 200);
+  assert.equal(res.status, 201);
   assert.ok(res.body.token);
   assert.equal(res.body.user.emailVerified, false);
   assert.equal(res.body.user.role, 'buyer');
   const code = lastCode(e, 'email-verification');
   assert.match(code ?? '', /^\d{6}$/);
 
-  const unverifiedLogin = await post('/sign-in/email', { email: e, password: PASSWORD });
+  const unverifiedLogin = await post('/buyer/sign-in', { email: e, password: PASSWORD });
   assert.equal(unverifiedLogin.status, 200);
   assert.equal(unverifiedLogin.body.user.emailVerified, false);
 
   const ok = await post('/email-otp/verify-email', { email: e, otp: code });
   assert.equal(ok.status, 200);
 
-  const login = await post('/sign-in/email', { email: e, password: PASSWORD });
+  const login = await post('/buyer/sign-in', { email: e, password: PASSWORD });
   assert.equal(login.status, 200);
   assert.equal(login.body.user.emailVerified, true);
 });
 
 test('sign-up ignores a role sent by the client', async () => {
   const e = email();
-  const signup = await post('/sign-up/email', { email: e, password: PASSWORD, name: 'X', role: 'seller' });
+  const signup = await post('/buyer/sign-up', { email: e, password: PASSWORD, name: 'X', role: 'seller' });
   assert.equal(signup.body.user.role, 'buyer');
-  const login = await post('/sign-in/email', { email: e, password: PASSWORD });
+  const login = await post('/buyer/sign-in', { email: e, password: PASSWORD });
   assert.equal(login.body.user.role, 'buyer');
 });
 
 test('duplicate sign-up is rejected', async () => {
   const { e } = await signUp();
-  const again = await post('/sign-up/email', { email: e, password: PASSWORD, name: 'Dup' });
+  const again = await post('/buyer/sign-up', { email: e, password: PASSWORD, name: 'Dup' });
   assert.equal(again.status, 422);
-  assert.equal(again.body.code, 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
+  assert.equal(again.body.error.code, 'USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL');
 });
 
 test('wrong code is rejected and the code dies after 3 attempts', async () => {
@@ -90,11 +90,11 @@ test('login with a one-time code works for a verified user', async () => {
   const code = lastCode(e, 'sign-in');
   assert.match(code ?? '', /^\d{6}$/);
 
-  const login = await post('/sign-in/email-otp', { email: e, otp: code });
+  const login = await post('/buyer/sign-in/otp', { email: e, otp: code });
   assert.equal(login.status, 200);
   assert.ok(login.body.token);
 
-  const reuse = await post('/sign-in/email-otp', { email: e, otp: code });
+  const reuse = await post('/buyer/sign-in/otp', { email: e, otp: code });
   assert.notEqual(reuse.status, 200);
 });
 
@@ -122,6 +122,21 @@ test('send-code endpoint is rate limited (429 on the 4th request per minute)', a
   }
   assert.deepEqual(statuses.slice(0, 3).map((s) => s === 429), [false, false, false]);
   assert.equal(statuses[3], 429);
+});
+
+test('generic Better Auth sign-up and sign-in endpoints are closed', async () => {
+  for (const path of ['/sign-up/email', '/sign-in/email', '/sign-in/email-otp']) {
+    const res = await post(path, { email: email(), password: PASSWORD, name: 'X', otp: '123456' });
+    assert.equal(res.status, 404);
+    assert.equal(res.body.error.code, 'ENDPOINT_MOVED');
+  }
+});
+
+test('a code cannot create an account (no code-only registration)', async () => {
+  const e = email();
+  await post('/email-otp/send-verification-otp', { email: e, type: 'sign-in' });
+  const res = await post('/buyer/sign-in/otp', { email: e, otp: lastCode(e, 'sign-in') ?? '123456' });
+  assert.notEqual(res.status, 200);
 });
 
 test('existing endpoints keep working next to auth', async () => {

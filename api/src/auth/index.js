@@ -26,6 +26,7 @@ export const auth = betterAuth({
       expiresIn: 600,
       allowedAttempts: 3,
       storeOTP: 'hashed',
+      disableSignUp: true, // las cuentas solo se crean por /auth/buyer/sign-up o /auth/seller/sign-up
       sendVerificationOnSignUp: true,
       sendVerificationOTP: async ({ email, otp, type }) => {
         // Sin await: evita diferencias de tiempo que revelen si el correo existe.
@@ -38,9 +39,6 @@ export const auth = betterAuth({
     window: 60,
     max: 100,
     customRules: {
-      '/sign-up/email': { window: 60, max: 5 },
-      '/sign-in/email': { window: 60, max: 5 },
-      '/sign-in/email-otp': { window: 60, max: 5 },
       '/email-otp/send-verification-otp': { window: 60, max: 3 },
       '/email-otp/verify-email': { window: 60, max: 5 },
     },

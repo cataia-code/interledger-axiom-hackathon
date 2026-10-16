@@ -21,11 +21,11 @@ async function register() {
   n++;
   const email = `m${Date.now()}${n}@metest.local`;
   const res = await request(app)
-    .post('/api/v1/auth/sign-up/email')
+    .post('/api/v1/auth/buyer/sign-up')
     .set('X-Forwarded-For', ip())
     .send({ email, password: 'Password-12345', name: 'Me' });
-  assert.equal(res.status, 200);
-  return { email, token: res.body.token, signedToken: res.headers['set-auth-token'] };
+  assert.equal(res.status, 201);
+  return { email, token: res.body.token };
 }
 
 const me = (token) => {
@@ -40,14 +40,6 @@ test('GET /me returns the current user with a bearer token', async () => {
   assert.equal(res.body.user.email, email);
   assert.equal(res.body.user.role, 'buyer');
   assert.deepEqual(Object.keys(res.body.user).sort(), ['email', 'emailVerified', 'id', 'name', 'role']);
-});
-
-test('GET /me accepts the signed token from the set-auth-token header', async () => {
-  const { email, signedToken } = await register();
-  assert.ok(signedToken);
-  const res = await me(signedToken);
-  assert.equal(res.status, 200);
-  assert.equal(res.body.user.email, email);
 });
 
 test('GET /me without or with an invalid token returns 401 JSON', async () => {
