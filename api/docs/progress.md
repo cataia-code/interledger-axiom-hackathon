@@ -45,13 +45,20 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - `POST /api/v1/auth/sign-out` con el token lo revoca (después `/me` da 401).
 - `test/me.test.js`: 5 pruebas (token crudo y firmado, sin token o inválido, sign-out, `requireRole` con buyer y seller). `npm test`: 18/18.
 
+### Fase 4: tiendas
+- Tabla `store` (id, user_id único con borrado en cascada, name, description, timestamps) en `src/db/stores.js`, separada de `schema.js` porque ese archivo lo regenera Better Auth. Migración `drizzle/0001_chilly_turbo.sql`; `drizzle.config.js` lee ambos archivos.
+- `POST /api/v1/stores` (requiere token): valida `name` (2-80 caracteres, obligatorio) y `description` (opcional, hasta 500), crea la tienda y pasa al usuario de `buyer` a `seller` en una sola transacción. Responde 201 con la tienda y el rol.
+- Un usuario solo puede tener una tienda: 409 `STORE_ALREADY_EXISTS`, también ante peticiones concurrentes (restricción única + transacción).
+- Código: `services/storeService.js`, `controllers/storeController.js`, ruta en `routes/index.js`.
+- `test/stores.test.js`: 7 pruebas (sin token, validación, creación y rol, descripción opcional, segunda tienda, concurrencia, borrado en cascada). `npm test`: 25/25.
+
 ## No hecho
 
 - Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
 - Recuperación de contraseña (los endpoints existen en el plugin pero no están probados ni se envía un correo específico).
 - Almacén de rate limit compartido: hoy es en memoria (se reinicia con el servidor y no sirve con varias instancias).
 - Detrás de un proxy hay que configurar `advanced.ipAddress` (cabeceras de confianza); si no, el límite por IP puede falsearse con `X-Forwarded-For`.
-- Fase 5: tabla `stores` y `POST /api/v1/stores` (el usuario pasa a `seller`).
+- Editar, ver o borrar tiendas (solo existe la creación), y tienda ↔ productos.
 - Pagos, pedidos, frontend/app móvil y despliegue quedan fuera de alcance.
 
 ## Notas y desviaciones

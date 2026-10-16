@@ -55,7 +55,7 @@
 <div class="wrap">
 
 <h1>Axiom API</h1>
-<p class="sub">Estado actual de la API REST (fases 1 a 3, login simplificado a contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
+<p class="sub">Estado actual de la API REST (fases 1 a 4, login simplificado a contraseña + código): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
 <nav>
   <a href="#resumen">Resumen</a><a href="#arranque">Arranque</a><a href="#general">Convenciones</a>
   <a href="#endpoints">Endpoints</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
@@ -123,6 +123,25 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 200 {"user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
 401 {"error":{"message":"Authentication required","code":"UNAUTHORIZED"}}</code></pre>
   <p>Está en <code>/api/v1/me</code> y no bajo <code>/auth</code>, porque <code>/api/v1/auth/*</code> lo atiende Better Auth.</p>
+</div>
+
+<h3>Tiendas</h3>
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/stores</span></div>
+  <p>Crea la tienda del usuario autenticado y lo promueve de <code>buyer</code> a <code>seller</code> (en una sola transacción). Un usuario solo puede tener una tienda.</p>
+  <table>
+    <tr><th>Campo</th><th>Tipo</th><th>Notas</th></tr>
+    <tr><td><code>name</code></td><td>string</td><td>obligatorio, 2-80 caracteres (se recortan espacios)</td></tr>
+    <tr><td><code>description</code></td><td>string</td><td>opcional, hasta 500 caracteres</td></tr>
+  </table>
+  <pre><code>curl -X POST localhost:3000/api/v1/stores \
+  -H 'Authorization: Bearer &lt;token&gt;' -H 'Content-Type: application/json' \
+  -d '{"name":"Panadería Luna","description":"Pan fresco"}'
+
+201 {"store":{"id":"…","name":"Panadería Luna","description":"Pan fresco","createdAt":"…"},"user":{"id":"…","role":"seller"}}
+400 {"error":{"message":"…","code":"INVALID_NAME"}}        (también INVALID_DESCRIPTION)
+401 {"error":{"message":"Authentication required","code":"UNAUTHORIZED"}}
+409 {"error":{"message":"The user already has a store","code":"STORE_ALREADY_EXISTS"}}</code></pre>
 </div>
 
 <h3>Autenticación <span class="pill">/api/v1/auth</span></h3>
@@ -258,8 +277,9 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugins <code>bearer</code> y <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
   <tr><td><code>src/mail/index.js</code></td><td>Transport de correo: consola (dev/test, guarda en <code>outbox</code>) o Resend (producción)</td></tr>
   <tr><td><code>src/db/</code></td><td>Conexión (<code>index.js</code>) y esquema generado (<code>schema.js</code>)</td></tr>
+  <tr><td><code>src/db/stores.js</code></td><td>Tabla <code>store</code> (propia, aparte del esquema generado)</td></tr>
   <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
-  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code>, <code>me.test.js</code></td></tr>
+  <tr><td><code>test/</code></td><td><code>api.test.js</code>, <code>db.test.js</code>, <code>auth.test.js</code>, <code>me.test.js</code>, <code>stores.test.js</code></td></tr>
 </table>
 
 <h3>Modelo de datos</h3>
@@ -268,13 +288,14 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
   <tr><td><code>user</code></td><td>Cuenta</td><td>id, email (único), email_verified, name, <strong>role</strong> (<code>buyer</code> por defecto, no nulo)</td></tr>
   <tr><td><code>session</code></td><td>Sesiones</td><td>token (único), expires_at, user_id</td></tr>
   <tr><td><code>account</code></td><td>Credenciales e identidades</td><td>provider_id, account_id, password (hash), user_id</td></tr>
+  <tr><td><code>store</code></td><td>Tienda de un vendedor</td><td>id, user_id (único, cascada), name, description</td></tr>
   <tr><td><code>verification</code></td><td>Códigos de un solo uso</td><td>identifier, value (hash), expires_at</td></tr>
 </table>
 <p>El esquema se genera desde la configuración de auth (<code>npm run auth:schema</code>) y se migra con Drizzle (<code>npm run db:generate</code> y <code>npm run db:migrate</code>).</p>
 
 <h3>Decisiones de diseño</h3>
 <ul>
-  <li><strong>Roles:</strong> uno por usuario (<code>buyer</code> | <code>seller</code>). Nace <code>buyer</code>; pasará a <code>seller</code> al crear una tienda (fase 5). El cliente no puede elegirlo (<code>input: false</code>).</li>
+  <li><strong>Roles:</strong> uno por usuario (<code>buyer</code> | <code>seller</code>). Nace <code>buyer</code>; pasará a <code>seller</code> al crear una tienda. El cliente no puede elegirlo (<code>input: false</code>).</li>
   <li><strong>Sesión móvil:</strong> token de sesión opaco y revocable de Better Auth, no JWT con refresh.</li>
   <li><strong>Envío de correo sin <code>await</code>:</strong> evita diferencias de tiempo que revelen si un correo existe.</li>
 </ul>
@@ -282,7 +303,7 @@ npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
 <h2 id="pendiente">Pendiente</h2>
 <table>
   <tr><th>Fase</th><th>Qué falta</th></tr>
-  <tr><td>4</td><td>Tiendas: <code>POST /stores</code> (con <code>requireAuth</code>) y cambio de rol a <code>seller</code></td></tr>
+  <tr><td>—</td><td>Ver, editar y borrar tiendas; productos y pedidos</td></tr>
   <tr><td>—</td><td>Resend con API key real, recuperación de contraseña, rate limit compartido, proxy de confianza para IP</td></tr>
 </table>
 

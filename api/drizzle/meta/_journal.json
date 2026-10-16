@@ -8,6 +8,13 @@
       "when": 1792170280559,
       "tag": "0000_shallow_sugar_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792172230358,
+      "tag": "0001_chilly_turbo",
+      "breakpoints": true
     }
   ]
 }
