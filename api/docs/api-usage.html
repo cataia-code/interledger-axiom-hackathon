@@ -1,0 +1,411 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom API: uso y definición</title>
+<style>
+  :root {
+    --bg: #fafaf8; --surface: #ffffff; --text: #1c1c1a; --muted: #5f5f5a; --border: #e3e2dc;
+    --accent: #2457d6; --code-bg: #f1f0ea; --ok: #1a7f4b; --warn: #a35a00; --err: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #151514; --surface: #1d1d1b; --text: #ecebe6; --muted: #a3a29b; --border: #33322e;
+      --accent: #7aa2ff; --code-bg: #262624; --ok: #5fd08f; --warn: #f0b35a; --err: #ff8a80;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #151514; --surface: #1d1d1b; --text: #ecebe6; --muted: #a3a29b; --border: #33322e;
+    --accent: #7aa2ff; --code-bg: #262624; --ok: #5fd08f; --warn: #f0b35a; --err: #ff8a80;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 880px; margin: 0 auto; padding: 32px 16px 80px; }
+  h1 { font-size: 1.9rem; margin: 0 0 4px; }
+  h2 { font-size: 1.3rem; margin: 44px 0 12px; padding-top: 8px; border-top: 1px solid var(--border); }
+  h3 { font-size: 1.05rem; margin: 24px 0 8px; }
+  p { margin: 8px 0; }
+  .sub { color: var(--muted); margin: 0 0 20px; }
+  nav { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 16px 0 8px; font-size: .92rem; }
+  a { color: var(--accent); }
+  code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .86rem; }
+  code { background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; overflow-x: auto; margin: 8px 0; border: 1px solid var(--border); }
+  pre code { background: none; padding: 0; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; margin: 12px 0; }
+  .ep { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px; margin-bottom: 4px; }
+  .m { font-weight: 700; font-size: .8rem; padding: 2px 8px; border-radius: 5px; color: #fff; }
+  .get { background: #1a7f4b; } .post { background: #2457d6; }
+  .path { font-family: ui-monospace, Menlo, monospace; font-size: .92rem; word-break: break-all; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: 8px 0; display: block; overflow-x: auto; }
+  th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  th { color: var(--muted); font-weight: 600; white-space: nowrap; }
+  .pill { font-size: .75rem; padding: 1px 7px; border-radius: 999px; border: 1px solid var(--border); color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .err { color: var(--err); }
+  .flow { display: grid; gap: 8px; margin: 12px 0; counter-reset: s; }
+  .flow div { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 10px 12px 10px 44px; position: relative; }
+  .flow div::before { counter-increment: s; content: counter(s); position: absolute; left: 12px; top: 10px; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--bg); font-size: .8rem; font-weight: 700; display: grid; place-items: center; }
+  .note { border-left: 3px solid var(--warn); padding: 6px 12px; background: var(--surface); border-radius: 0 8px 8px 0; margin: 12px 0; font-size: .92rem; }
+  .tag { display: inline-block; margin: 2px 6px 2px 0; }
+
+  .er { width: 100%; height: auto; display: block; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; }
+  .er .eb { fill: var(--bg); stroke: var(--border); stroke-width: 1.2; }
+  .er .eh { fill: var(--code-bg); }
+  .er .dashed .eb { stroke-dasharray: 5 4; }
+  .er .en { font: 700 14px ui-monospace, Menlo, monospace; fill: var(--text); }
+  .er .ec { font: 12.5px ui-monospace, Menlo, monospace; fill: var(--text); }
+  .er .ec.pk { font-weight: 700; fill: var(--accent); }
+  .er .ec.fk { fill: var(--warn); }
+  .er .et2 { font: 11.5px ui-monospace, Menlo, monospace; fill: var(--muted); }
+  .er .tg { font: 600 10.5px system-ui, sans-serif; fill: var(--muted); }
+  .er .el { stroke: var(--border); stroke-width: 1; }
+  .er .rel { fill: none; stroke: var(--accent); stroke-width: 1.6; }
+  .er .rel.dash { stroke: var(--muted); stroke-dasharray: 4 4; }
+  .er .card { font: 700 12px system-ui, sans-serif; fill: var(--accent); }
+  .er .note-t { font: 11.5px system-ui, sans-serif; fill: var(--muted); }
+  .er .grp { stroke-width: 1.4; }
+  .er .ga { fill: color-mix(in srgb, var(--accent) 7%, transparent); stroke: var(--accent); stroke-dasharray: 2 0; }
+  .er .gb { fill: color-mix(in srgb, var(--ok) 7%, transparent); stroke: var(--ok); }
+  .er .gt { font: 700 12px system-ui, sans-serif; letter-spacing: .08em; fill: var(--text); }
+  .er .gs { font: 11.5px system-ui, sans-serif; fill: var(--muted); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: .85rem; color: var(--muted); margin: 8px 0; }
+  footer { margin-top: 48px; color: var(--muted); font-size: .85rem; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>Axiom API</h1>
+<p class="sub">Estado actual de la API REST (auth por rol, catálogo, inventario, pedidos y pagos): cómo se usa y cómo está definida. Rama <code>feature/base_api_nodejs</code>.</p>
+<nav>
+  <a href="#resumen">Resumen</a><a href="#arranque">Arranque</a><a href="#general">Convenciones</a>
+  <a href="#endpoints">Endpoints</a><a href="#marketplace">Marketplace</a><a href="#flujos">Flujos de auth</a><a href="#errores">Errores</a>
+  <a href="#limites">Rate limit</a><a href="#definicion">Cómo se define</a><a href="#modelo">Modelo relacional</a><a href="#pendiente">Pendiente</a>
+</nav>
+
+<h2 id="resumen">Resumen</h2>
+<div class="card">
+  <p>API en <strong>Node.js 24 + Express 5</strong> (JavaScript ESM), con <strong>PostgreSQL</strong> vía Drizzle y autenticación con <strong>Better Auth</strong> montada bajo <code>/api/v1/auth</code>.</p>
+  <p>
+    <span class="tag pill">Express 5</span><span class="tag pill">Better Auth 1.7</span><span class="tag pill">Drizzle ORM</span>
+    <span class="tag pill">PostgreSQL 17</span><span class="tag pill">node --test + supertest</span><span class="tag pill">ESLint</span>
+  </p>
+  <p>Los ids son numéricos. Dinero siempre en unidades menores de la moneda de la sucursal (centavos), nunca decimales. Listas con paginación por cursor (<code>?limit</code>, <code>?cursor</code> → <code>nextCursor</code>).</p>
+  <p>URL base local: <code>http://localhost:3000/api/v1</code>. Todas las respuestas son JSON.</p>
+</div>
+
+<h2 id="arranque">Arranque local</h2>
+<pre><code>cd api
+cp .env.example .env     # ajusta BETTER_AUTH_SECRET (32+ caracteres aleatorios)
+npm install
+npm run db:up            # Postgres en Docker (puerto 5432)
+npm run db:migrate       # crea las tablas
+npm run dev              # servidor con recarga en :3000
+npm test                 # pruebas (necesitan Postgres arriba)</code></pre>
+<table>
+  <tr><th>Variable</th><th>Uso</th><th>Por defecto</th></tr>
+  <tr><td><code>PORT</code></td><td>Puerto HTTP</td><td>3000</td></tr>
+  <tr><td><code>NODE_ENV</code></td><td><code>development</code> | <code>test</code> | <code>production</code></td><td>development</td></tr>
+  <tr><td><code>CORS_ORIGIN</code></td><td>Origen permitido por CORS</td><td>*</td></tr>
+  <tr><td><code>DATABASE_URL</code></td><td>Conexión a Postgres</td><td>postgres://axiom:axiom@localhost:5432/axiom</td></tr>
+  <tr><td><code>BETTER_AUTH_SECRET</code></td><td>Secreto de Better Auth</td><td>obligatorio</td></tr>
+  <tr><td><code>BETTER_AUTH_URL</code></td><td>URL pública de la API</td><td>http://localhost:3000</td></tr>
+  <tr><td><code>RESEND_API_KEY</code>, <code>MAIL_FROM</code></td><td>Envío real de correo (solo producción)</td><td>vacío</td></tr>
+</table>
+
+<h2 id="general">Convenciones</h2>
+<div class="card">
+  <p><strong>Formato:</strong> peticiones con <code>Content-Type: application/json</code>.</p>
+  <p><strong>Versionado:</strong> todo cuelga de <code>/api/v1</code>.</p>
+  <p><strong>Errores propios</strong> (rutas inexistentes, fallos internos): <code>{ "error": { "message", "code" } }</code>.</p>
+  <p><strong>Errores de auth</strong> (los devuelve Better Auth): <code>{ "message", "code" }</code>. Los dos formatos conviven por ahora.</p>
+  <p><strong>Seguridad base:</strong> <code>helmet</code> (cabeceras seguras) y <code>cors</code>.</p>
+</div>
+
+<h2 id="endpoints">Endpoints</h2>
+
+<h3>Utilidad</h3>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/health</span></div>
+  <p>Comprueba que la API responde.</p>
+  <pre><code>curl localhost:3000/api/v1/health
+{"status":"ok"}</code></pre>
+</div>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/ping</span></div>
+  <p>Ruta de ejemplo del patrón route → controller → service. Devuelve un contador en memoria.</p>
+  <pre><code>{"message":"pong","count":1}</code></pre>
+</div>
+
+<h3>Usuario autenticado</h3>
+<div class="card">
+  <div class="ep"><span class="m get">GET</span><span class="path">/api/v1/me</span></div>
+  <p>Devuelve el usuario de la sesión. Requiere <code>Authorization: Bearer &lt;token&gt;</code>, con el <code>token</code> que devuelven el registro y el login (o la cabecera <code>set-auth-token</code>).</p>
+  <pre><code>curl localhost:3000/api/v1/me -H 'Authorization: Bearer &lt;token&gt;'
+200 {"user":{"id":1,"email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false,"phone":null}}
+401 {"error":{"message":"Authentication required","code":"UNAUTHORIZED"}}</code></pre>
+  <p><code>PATCH /api/v1/me</code> edita <code>name</code> (1-80) y <code>phone</code> (hasta 30, o <code>null</code>); el resto de campos se ignora. 400 <code>EMPTY_UPDATE</code> si no hay nada que cambiar.</p>
+  <p>Está en <code>/api/v1/me</code> y no bajo <code>/auth</code>, porque <code>/api/v1/auth/*</code> lo atiende Better Auth.</p>
+</div>
+
+<h3>Registro e inicio de sesión por rol <span class="pill">/api/v1/auth/buyer/* · /api/v1/auth/seller/*</span></h3>
+<p>Comprador y vendedor tienen rutas separadas. Comparten tablas y sesiones, pero <strong>cada login solo acepta su rol</strong>. Un vendedor siempre tiene organización y sucursal: se crea junto con la cuenta. Las rutas genéricas de Better Auth para registrarse e iniciar sesión (<code>/auth/sign-up/email</code>, <code>/auth/sign-in/email</code>, <code>/auth/sign-in/email-otp</code>) están cerradas y responden 404 <code>ENDPOINT_MOVED</code>.</p>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/buyer/sign-up</span></div>
+  <p>Crea una cuenta de comprador, inicia sesión (devuelve <code>token</code>) y envía un código de verificación al correo (la verificación es opcional).</p>
+  <table>
+    <tr><th>Campo</th><th>Tipo</th><th>Notas</th></tr>
+    <tr><td><code>email</code></td><td>string</td><td>único</td></tr>
+    <tr><td><code>password</code></td><td>string</td><td>mínimo 8 caracteres</td></tr>
+    <tr><td><code>name</code></td><td>string</td><td>obligatorio</td></tr>
+  </table>
+  <pre><code>curl -X POST localhost:3000/api/v1/auth/buyer/sign-up \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"ana@ejemplo.com","password":"Password-12345","name":"Ana"}'
+
+201 {"token":"…","user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
+400 {"error":{"message":"Password too short","code":"PASSWORD_TOO_SHORT"}}
+422 {"error":{"message":"User already exists. Use another email.","code":"USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL"}}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/seller/sign-up</span></div>
+  <p>Crea <strong>usuario, organización y su única sucursal en un solo paso</strong>, con rol <code>seller</code>. Todo se valida antes de crear nada, y si algo falla la cuenta se deshace: nunca queda un vendedor sin organización ni sucursal. No se puede registrar con un correo que ya existe, ni siquiera como comprador.</p>
+  <table>
+    <tr><th>Campo</th><th>Tipo</th><th>Notas</th></tr>
+    <tr><td><code>email</code>, <code>password</code>, <code>name</code></td><td>string</td><td>igual que el comprador</td></tr>
+    <tr><td><code>organization.legalName</code></td><td>string</td><td>razón social, obligatorio, 2-120</td></tr>
+    <tr><td><code>organization.tradeName</code></td><td>string</td><td>nombre comercial, opcional, hasta 120</td></tr>
+    <tr><td><code>organization.taxId</code></td><td>string</td><td>identificación fiscal, obligatorio, 3-40, <strong>único</strong></td></tr>
+    <tr><td><code>organization.legalId</code></td><td>string</td><td>identificador legal (p. ej. registro mercantil), 3-40, <strong>único</strong></td></tr>
+    <tr><td><code>organization.country</code></td><td>string</td><td>código ISO de 2 letras (se guarda en mayúsculas)</td></tr>
+    <tr><td><code>organization.legalAddress</code></td><td>string</td><td>obligatorio, 5-200</td></tr>
+    <tr><td><code>organization.phone</code></td><td>string</td><td>opcional, hasta 30</td></tr>
+    <tr><td><code>store.name</code></td><td>string</td><td>obligatorio, 2-80</td></tr>
+    <tr><td><code>store.description</code></td><td>string</td><td>opcional, hasta 500</td></tr>
+    <tr><td><code>store.address</code>, <code>store.city</code></td><td>string</td><td>obligatorios (5-200 y 2-80)</td></tr>
+    <tr><td><code>store.phone</code></td><td>string</td><td>opcional, hasta 30</td></tr>
+    <tr><td><code>store.latitude</code>, <code>store.longitude</code></td><td>número</td><td>obligatorios (−90…90 y −180…180)</td></tr>
+    <tr><td><code>store.legalId</code></td><td>string</td><td>identificador legal de la sucursal, 3-40</td></tr>
+    <tr><td><code>store.currency</code></td><td>string</td><td>moneda ISO 4217 de 3 letras; todos los precios de la sucursal van en ella (no se puede cambiar)</td></tr>
+  </table>
+  <pre><code>-d '{"email":"luna@ejemplo.com","password":"Password-12345","name":"Luna",
+     "organization":{"legalName":"Panadería Luna S.A.","taxId":"8-123-456","legalId":"RM-2024-001","country":"PA","legalAddress":"Calle 50, Ciudad de Panamá"},
+     "store":{"name":"Sucursal Centro","address":"Av. Central 123","city":"Ciudad de Panamá","latitude":8.98,"longitude":-79.52,"legalId":"SUC-001","currency":"USD"}}'
+
+201 {"token":"…","user":{…,"role":"seller"},
+     "organization":{"id":"…","legalName":"Panadería Luna S.A.","tradeName":null,"taxId":"8-123-456","legalId":"RM-2024-001","country":"PA","legalAddress":"…","phone":null,"createdAt":"…"},
+     "store":{"id":"…","organizationId":"…","name":"Sucursal Centro","address":"Av. Central 123","city":"Ciudad de Panamá",…}}
+400 {"error":{"message":"…","code":"INVALID_LEGAL_NAME"}}   (también INVALID_COUNTRY, INVALID_TAX_ID, INVALID_LEGAL_ADDRESS, INVALID_NAME, INVALID_ADDRESS, INVALID_CITY, INVALID_LEGAL_ID, INVALID_LATITUDE, INVALID_LONGITUDE, INVALID_CURRENCY, INVALID_PHONE…)
+409 TAX_ID_ALREADY_EXISTS · LEGAL_ID_ALREADY_EXISTS
+422 USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/buyer/sign-in</span> <span class="m post">POST</span><span class="path">/api/v1/auth/seller/sign-in</span></div>
+  <p>Inicia sesión con correo y contraseña, solo si la cuenta tiene el rol de la ruta. No exige el correo verificado. El rol se comprueba <em>después</em> de validar la contraseña, para no revelar qué correos existen; si no coincide, la sesión recién creada se revoca y no se devuelve ningún token. El login de vendedor exige además que existan su organización y al menos una sucursal.</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","password":"Password-12345"}'
+
+200 {"token":"…","user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
+401 {"error":{"message":"Invalid email or password","code":"INVALID_EMAIL_OR_PASSWORD"}}
+403 {"error":{"message":"This account is a seller; use the seller login","code":"WRONG_ROLE"}}
+403 {"error":{"message":"A seller must have a store","code":"STORE_REQUIRED"}}   (o ORGANIZATION_REQUIRED)</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/buyer/sign-in/otp</span> <span class="m post">POST</span><span class="path">/api/v1/auth/seller/sign-in/otp</span></div>
+  <p>Inicia sesión con un código de un solo uso (antes hay que pedirlo con <code>send-verification-otp</code>). Mismas reglas de rol que el login con contraseña. <strong>No crea cuentas</strong>: un correo desconocido no puede registrarse con un código.</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","otp":"123456"}'
+200 {"token":"…","user":{"id":"…","email":"ana@ejemplo.com","name":"Ana","role":"buyer","emailVerified":false}}
+400 {"message":"Invalid OTP","code":"INVALID_OTP"}   403 WRONG_ROLE</code></pre>
+</div>
+
+<h3>Recuperar contraseña</h3>
+<p><code>POST /api/v1/auth/email-otp/request-password-reset</code> con <code>{"email"}</code> envía un código al correo; <code>POST /api/v1/auth/email-otp/reset-password</code> con <code>{"email","otp","password"}</code> cambia la contraseña. Las sesiones anteriores se revocan.</p>
+
+<h3>Rutas compartidas <span class="pill">/api/v1/auth/*</span> (Better Auth)</h3>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/email-otp/send-verification-otp</span></div>
+  <p>Envía (o reenvía) un código al correo. Un código nuevo invalida el anterior.</p>
+  <table>
+    <tr><th><code>type</code></th><th>Para qué</th></tr>
+    <tr><td><code>sign-in</code></td><td>Iniciar sesión con código</td></tr>
+    <tr><td><code>email-verification</code></td><td>Reenviar el código de verificación</td></tr>
+    <tr><td><code>forget-password</code></td><td>Reservado para recuperar contraseña (sin probar)</td></tr>
+  </table>
+  <pre><code>-d '{"email":"ana@ejemplo.com","type":"sign-in"}'
+200 {"success":true}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/email-otp/verify-email</span></div>
+  <p>Verifica el correo con el código de 6 dígitos recibido.</p>
+  <pre><code>-d '{"email":"ana@ejemplo.com","otp":"123456"}'
+200 {"status":true,"token":null,"user":{…,"emailVerified":true}}
+400 {"message":"Invalid OTP","code":"INVALID_OTP"}</code></pre>
+</div>
+
+<div class="card">
+  <div class="ep"><span class="m post">POST</span><span class="path">/api/v1/auth/sign-out</span></div>
+  <p>Cierra la sesión y revoca el token (enviado en <code>Authorization: Bearer</code>, con cuerpo <code>{}</code>). Después, <code>/me</code> responde 401.</p>
+</div>
+
+<div class="note">Better Auth expone más rutas bajo <code>/api/v1/auth/*</code> (por ejemplo cambio y restablecimiento de contraseña, <code>get-session</code>). Solo están documentadas arriba las que están probadas. Estas rutas devuelven errores como <code>{"message","code"}</code>, sin el envoltorio <code>error</code>.</div>
+
+<h2 id="marketplace">Marketplace</h2>
+<p>Rutas bajo <code>/api/v1</code>. «seller» y «buyer» exigen <code>Authorization: Bearer</code> con ese rol (401 sin sesión, 403 con otro rol).</p>
+<h3>Sucursal y organización (vendedor)</h3>
+<p>Cada organización tiene una sola sucursal en el MVP. <code>taxId</code>, <code>legalId</code>, <code>country</code>, <code>currency</code> y el <code>legalId</code> de la sucursal no se pueden editar. Cerrar la sucursal no borra su historial; el vendedor ya no puede iniciar sesión como tal (<code>STORE_REQUIRED</code>). Ya no existe <code>POST /stores</code> (404).</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/organization</code></td><td>seller</td><td>Datos legales de la organización</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/organization</code></td><td>seller</td><td>Edita <code>legalName</code>, <code>tradeName</code>, <code>legalAddress</code>, <code>phone</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/store</code></td><td>seller</td><td>Sucursal propia</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/store</code></td><td>seller</td><td>Edita nombre, descripción, dirección, ciudad, teléfono, lat/lon y <code>status</code> (<code>active</code> | <code>paused</code>)</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/store</code></td><td>seller</td><td>Cierra la sucursal (<code>status: closed</code>, borrado lógico)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/stores/:id</code></td><td>público</td><td>Vista pública de la sucursal; 404 si está cerrada</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/stores/:id/categories</code></td><td>público</td><td>Categorías de la sucursal</td></tr></table>
+<h3>Catálogo (vendedor)</h3>
+<p>Todo se limita a la sucursal del vendedor: lo de otra sucursal responde 403 <code>FORBIDDEN</code> (404 si no existe). <code>priceAmount</code> es entero ≥ 0. Estados del ítem: <code>draft</code>, <code>active</code>, <code>inactive</code>; solo los <code>active</code> de una sucursal activa se ven públicamente. El SKU es único por sucursal (409 <code>SKU_ALREADY_EXISTS</code>), incluso si el ítem se borró.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/categories</code></td><td>seller</td><td>Categorías propias (árbol con <code>parentId</code>)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/categories</code></td><td>seller</td><td>Crea (<code>name</code>, <code>slug</code> opcional, <code>parentId</code> opcional). 409 <code>CATEGORY_SLUG_EXISTS</code></td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/categories/:id</code></td><td>seller</td><td>Edita; 400 <code>CATEGORY_CYCLE</code> si crea un ciclo</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/categories/:id</code></td><td>seller</td><td>Borra; sus ítems quedan sin categoría y las hijas suben a la raíz</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items</code></td><td>seller</td><td>Lista (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items</code></td><td>seller</td><td>Crea: <code>sku</code>, <code>name</code>, <code>description</code>, <code>priceAmount</code>, <code>categoryId</code>, <code>status</code> (por defecto <code>draft</code>), <code>initialStock</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Detalle con imágenes, descuentos y stock</td></tr><tr><td><span class="m post" style="background:#8a5a00">PATCH</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Edición parcial</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id</code></td><td>seller</td><td>Borrado lógico (204)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/discounts</code></td><td>seller</td><td><code>type</code> <code>percent</code> (puntos base, 1500 = 15 %) o <code>fixed</code> (&lt; precio), <code>startsAt</code>, <code>endsAt</code>. Solo un descuento a la vez: 409 <code>DISCOUNT_OVERLAP</code></td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id/discounts/:discountId</code></td><td>seller</td><td>Desactiva el descuento</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/images</code></td><td>seller</td><td><code>multipart/form-data</code>, campo <code>image</code> (JPEG, PNG o WebP, hasta 5 MB). Se recorta a 1024×1024, se comprime a WebP y se guarda en disco; hasta 8 por ítem</td></tr><tr><td><span class="m post" style="background:#8a5a00">PUT</span></td><td><code>/seller/items/:id/images/order</code></td><td>seller</td><td><code>{"ids":[…]}</code> con todas las imágenes en el nuevo orden</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/seller/items/:id/images/:imageId</code></td><td>seller</td><td>Borra la imagen y su archivo</td></tr></table>
+<h3>Catálogo (comprador, público)</h3>
+<p>Sin autenticación. Muestra <code>available</code> (stock menos reservas), nunca el stock real. Cada ítem trae <code>currency</code>, <code>discount</code>, <code>discountAmount</code> y <code>finalPriceAmount</code>. Las imágenes se sirven en <code>/uploads/…</code> (campo <code>url</code>).</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/items</code></td><td>público</td><td>Filtros <code>categoryId</code>, <code>storeId</code>, <code>q</code> (texto en nombre y descripción), <code>sort</code> (<code>newest</code> | <code>price_asc</code> | <code>price_desc</code>), <code>limit</code> (1-50), <code>cursor</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/items/:id</code></td><td>público</td><td>Detalle de un ítem</td></tr></table>
+<h3>Inventario (vendedor)</h3>
+<p><code>item.current_stock</code> se actualiza en la misma transacción que cada movimiento del libro <code>stock_movement</code> (<code>initial</code>, <code>restock</code>, <code>adjustment</code>, <code>sale</code>, <code>cancel</code>) y nunca baja de 0 (409 <code>INSUFFICIENT_STOCK</code>, también con compras simultáneas). El resumen incluye <code>consistent</code>: el stock guardado coincide con la suma de movimientos.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id/stock</code></td><td>seller</td><td><code>currentStock</code>, <code>reserved</code>, <code>available</code>, <code>movementsTotal</code>, <code>consistent</code></td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/items/:id/stock</code></td><td>seller</td><td><code>{"type":"restock","quantity":5}</code> o <code>{"type":"adjustment","delta":-2,"reason":"merma"}</code> (el ajuste exige motivo)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/items/:id/stock-movements</code></td><td>seller</td><td>Historial, más reciente primero, con cursor</td></tr></table>
+<h3>Carrito y pedidos (comprador)</h3>
+<p>El carrito es de una sola sucursal (409 <code>CART_OTHER_STORE</code>). El checkout exige la cabecera <code>Idempotency-Key</code> (8-80 caracteres): crea el pedido a la sucursal con nombre, SKU, precio original, descuento y precio unitario congelados, reserva el stock (15 min) y convierte el carrito; repetir la misma clave devuelve el mismo pedido (200). Comisión del marketplace: <code>commissionRate</code> 0.001 (0.1 %) sobre el total, guardada en el pedido. Un pedido ajeno responde 404 <code>ORDER_NOT_FOUND</code>.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/cart</code></td><td>buyer</td><td>Carrito con precios y disponibilidad actuales</td></tr><tr><td><span class="m post" style="background:#8a5a00">PUT</span></td><td><code>/cart/items/:itemId</code></td><td>buyer</td><td><code>{"quantity":2}</code> (1-999); reemplaza la cantidad. 409 <code>INSUFFICIENT_STOCK</code></td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/cart/items/:itemId</code></td><td>buyer</td><td>Quita el ítem</td></tr><tr><td><span class="m post" style="background:#b3261e">DELETE</span></td><td><code>/cart</code></td><td>buyer</td><td>Vacía el carrito (204)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders</code></td><td>buyer</td><td>Checkout. 201 (nuevo) o 200 (misma clave). 400 <code>CART_EMPTY</code>, 409 <code>INSUFFICIENT_STOCK</code> / <code>ITEM_UNAVAILABLE</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders</code></td><td>buyer</td><td>Mis pedidos (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders/:id</code></td><td>buyer</td><td>Pedido con líneas e historial de estados</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders/:id/cancel</code></td><td>buyer</td><td>Cancela (pendiente de pago o pagado); libera o devuelve stock y reembolsa lo cobrado</td></tr></table>
+<h3>Pedidos (vendedor)</h3>
+<p>Estados: <code>pending_payment → paid → preparing → completed</code>, con <code>cancelled</code> y <code>refunded</code>. No hay envíos. Un salto inválido responde 409 <code>INVALID_TRANSITION</code>. Los pedidos sin pagar en 15 minutos se cancelan solos y liberan su stock.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders</code></td><td>seller</td><td>Pedidos de la sucursal (<code>status</code>, <code>limit</code>, <code>cursor</code>)</td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders/:id</code></td><td>seller</td><td>Detalle e historial</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/orders/:id/status</code></td><td>seller</td><td><code>{"status":"preparing"|"completed"|"cancelled","note":"…"}</code></td></tr></table>
+<h3>Pagos y reembolsos</h3>
+<p>El proveedor de pago es un <strong>placeholder</strong> (<code>provider: "placeholder"</code>) sin definir. El cobro se confirma con un webhook propio protegido por la cabecera <code>X-Webhook-Secret</code> (variable <code>PAYMENT_WEBHOOK_SECRET</code>); al cambiar de proveedor solo se reemplaza el adaptador en <code>src/payments/</code>. Cada evento (<code>eventId</code>) se procesa una sola vez. Si llega un cobro cuando el pedido ya no se puede pagar (cancelado, o sin stock tras vencer la reserva), se reembolsa completo.</p>
+<table><tr><th>Método</th><th>Ruta</th><th>Quién</th><th>Qué hace</th></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/orders/:id/pay</code></td><td>buyer</td><td>Inicia el cobro (<code>Idempotency-Key</code> obligatoria). 201 o 200; nunca dos cobros pendientes a la vez. 409 <code>ORDER_NOT_PAYABLE</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/orders/:id/payments</code></td><td>buyer</td><td>Pagos del pedido con sus reembolsos (comprobante)</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/payments/webhook/placeholder</code></td><td>proveedor</td><td><code>{"eventId","type":"payment.captured"|"payment.failed","providerRef"}</code>. Capturado: pedido <code>paid</code> y reserva convertida en venta. Fallido: el pedido sigue pendiente para reintentar. Repetido: <code>duplicate</code></td></tr><tr><td><span class="m get" style="background:#1a7f4b">GET</span></td><td><code>/seller/orders/:id/payments</code></td><td>seller</td><td>Pagos y reembolsos del pedido</td></tr><tr><td><span class="m post" style="background:#2457d6">POST</span></td><td><code>/seller/orders/:id/refunds</code></td><td>seller</td><td><code>{"amount":400,"reason":"…"}</code>; sin <code>amount</code> reembolsa lo que falta. Nunca supera lo cobrado (400 <code>INVALID_AMOUNT</code>, 409 <code>REFUND_EXCEEDS_PAYMENT</code>); el total de un pedido sin completar se hace cancelándolo (409 <code>USE_CANCEL</code>)</td></tr></table>
+
+<h2 id="flujos">Flujos de auth</h2>
+<h3>A. Comprador</h3>
+<div class="flow">
+  <div><code>POST /auth/buyer/sign-up</code>: se crea la cuenta (<code>buyer</code>), se inicia sesión (devuelve <code>token</code>) y se envía un código de verificación.</div>
+  <div>Opcional: <code>POST /auth/email-otp/verify-email</code> con el código marca el correo como verificado.</div>
+  <div>Más tarde: <code>POST /auth/buyer/sign-in</code> (contraseña) o <code>send-verification-otp</code> + <code>POST /auth/buyer/sign-in/otp</code> (código).</div>
+</div>
+<h3>B. Vendedor</h3>
+<div class="flow">
+  <div><code>POST /auth/seller/sign-up</code> con los datos de la cuenta y de la tienda: se crean usuario (<code>seller</code>) y tienda juntos, y se devuelve el <code>token</code>.</div>
+  <div>Más tarde: <code>POST /auth/seller/sign-in</code> o <code>/auth/seller/sign-in/otp</code>. Un comprador que intente entrar aquí recibe 403 <code>WRONG_ROLE</code> (y al revés).</div>
+</div>
+<div class="note"><strong>Limitación conocida:</strong> como la verificación es opcional, un usuario que se registró con contraseña y no verificó su correo <strong>pierde la contraseña</strong> si luego entra con código (Better Auth la borra y revoca sus sesiones para evitar robo de cuentas). Después, el login con contraseña da 401 hasta restablecerla. Decisión tomada: no se limita el login con código a correos verificados, así que el comportamiento se acepta por ahora.</div>
+
+<h3>Códigos de un solo uso</h3>
+<table>
+  <tr><th>Longitud</th><th>Caduca</th><th>Intentos</th><th>Almacenado</th></tr>
+  <tr><td>6 dígitos</td><td>10 minutos</td><td>3 (luego queda invalidado)</td><td>con hash</td></tr>
+</table>
+<p>En desarrollo y tests el correo no sale: el código se imprime en la consola del servidor (<code>[mail] to=… </code>).</p>
+
+<h2 id="errores">Errores</h2>
+<table>
+  <tr><th>HTTP</th><th>Cuándo</th><th>Cuerpo</th></tr>
+  <tr><td class="err">400</td><td>Datos inválidos, código incorrecto</td><td><code>{"message","code"}</code></td></tr>
+  <tr><td class="err">401</td><td>Credenciales incorrectas, o sin token válido en rutas protegidas</td><td><code>INVALID_EMAIL_OR_PASSWORD</code> (auth) · <code>{"error":{…,"code":"UNAUTHORIZED"}}</code></td></tr>
+  <tr><td class="err">403</td><td>Rol insuficiente (<code>requireRole</code>), login por la ruta del otro rol, vendedor sin tienda</td><td><code>FORBIDDEN</code> · <code>WRONG_ROLE</code> · <code>ORGANIZATION_REQUIRED</code> · <code>STORE_REQUIRED</code></td></tr>
+  <tr><td class="err">404</td><td>Ruta inexistente, o ruta genérica de registro/login cerrada</td><td><code>NOT_FOUND</code> · <code>ENDPOINT_MOVED</code></td></tr>
+  <tr><td class="err">409</td><td>Conflicto de datos o de estado</td><td><code>TAX_ID_ALREADY_EXISTS</code> · <code>LEGAL_ID_ALREADY_EXISTS</code> · <code>SKU_ALREADY_EXISTS</code> · <code>CATEGORY_SLUG_EXISTS</code> · <code>DISCOUNT_OVERLAP</code> · <code>INSUFFICIENT_STOCK</code> · <code>CART_OTHER_STORE</code> · <code>ITEM_UNAVAILABLE</code> · <code>INVALID_TRANSITION</code> · <code>ORDER_NOT_PAYABLE</code> · <code>REFUND_EXCEEDS_PAYMENT</code> · <code>USE_CANCEL</code> · <code>IMAGE_LIMIT</code></td></tr>
+  <tr><td class="err">413</td><td>Imagen de más de 5 MB</td><td><code>IMAGE_TOO_LARGE</code></td></tr>
+  <tr><td class="err">422</td><td>Correo ya registrado</td><td><code>USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL</code></td></tr>
+  <tr><td class="err">429</td><td>Demasiadas peticiones</td><td>rutas por rol: <code>{"error":{…,"code":"RATE_LIMITED"}}</code> · rutas de Better Auth: <code>{"message":"Too many requests…"}</code> y cabecera <code>x-retry-after</code></td></tr>
+  <tr><td class="err">500</td><td>Fallo interno</td><td><code>{"error":{"message","code":"INTERNAL_ERROR"}}</code> (en producción el mensaje es genérico)</td></tr>
+</table>
+
+<h2 id="limites">Rate limiting</h2>
+<p>Por IP, ventana de 60 s, activo en todos los entornos. Los contadores están en memoria (se reinician con el servidor). Si la API va detrás de un proxy, hay que definir <code>TRUST_PROXY</code> (número de proxies; configura <code>trust proxy</code> y la IP de Better Auth) en Express y las cabeceras de IP de confianza en Better Auth; si no, el límite puede falsearse o aplicarse a la IP del proxy.</p>
+<table>
+  <tr><th>Ruta</th><th>Máx. / minuto</th><th>Quién lo aplica</th></tr>
+  <tr><td><code>/auth/buyer/*</code> y <code>/auth/seller/*</code> (cada ruta por separado)</td><td>5</td><td><code>express-rate-limit</code> (código propio)</td></tr>
+  <tr><td><code>/auth/email-otp/send-verification-otp</code></td><td>3</td><td>Better Auth</td></tr>
+  <tr><td><code>/auth/email-otp/verify-email</code></td><td>5</td><td>Better Auth</td></tr>
+  <tr><td><code>/auth/email-otp/request-password-reset</code></td><td>3</td><td>Better Auth</td></tr>
+  <tr><td><code>/auth/email-otp/reset-password</code></td><td>5</td><td>Better Auth</td></tr>
+  <tr><td>Toda la API propia (<code>/api/v1/*</code>): lecturas / escrituras</td><td>600 / 120</td><td><code>express-rate-limit</code>, por token de sesión o IP</td></tr>
+  <tr><td><code>POST /orders</code>, <code>POST /orders/:id/pay</code></td><td>10</td><td><code>express-rate-limit</code></td></tr>
+  <tr><td><code>POST /seller/items/:id/images</code></td><td>20</td><td><code>express-rate-limit</code></td></tr>
+  <tr><td><code>POST /payments/webhook/placeholder</code></td><td>300</td><td><code>express-rate-limit</code></td></tr>
+  <tr><td>resto de <code>/auth/*</code></td><td>100</td><td>Better Auth</td></tr>
+</table>
+
+<h2 id="definicion">Cómo se define</h2>
+<h3>Ciclo de una petición</h3>
+<pre><code>cliente
+  → pino-http (log)  → helmet  → cors
+  → /api/v1/auth/*splat  → Better Auth (toNodeHandler)   ← antes de express.json()
+  → express.json()
+  → /api/v1/*            → routes → controllers → services
+  → notFound (404)       → errorHandler (JSON)</code></pre>
+
+<h3>Estructura</h3>
+<table>
+  <tr><th>Ruta</th><th>Qué contiene</th></tr>
+  <tr><td><code>src/app.js</code></td><td>Crea la app y ordena los middlewares (<code>createApp()</code>, sin <code>listen</code>)</td></tr>
+  <tr><td><code>src/server.js</code></td><td>Arranca el servidor y cierra ordenadamente con SIGTERM/SIGINT</td></tr>
+  <tr><td><code>src/config/index.js</code></td><td>Lee variables de entorno (dotenv)</td></tr>
+  <tr><td><code>src/routes/</code>, <code>controllers/</code>, <code>services/</code></td><td>Patrón route → controller → service (health, ping, me y las rutas por rol)</td></tr>
+  <tr><td><code>src/routes/roleAuth.js</code>, <code>controllers/roleAuthController.js</code>, <code>services/roleAuthService.js</code></td><td>Registro y login de comprador y vendedor: llaman a Better Auth por dentro, validan el rol y crean la organización y la primera sucursal del vendedor</td></tr>
+  <tr><td><code>src/services/storeService.js</code>, <code>sellerService.js</code></td><td>Validación de los datos de organización y sucursal; creación transaccional (organización + sucursal + rol <code>seller</code>) y alta de sucursales</td></tr>
+  <tr><td><code>src/middlewares/errorHandler.js</code></td><td><code>HttpError</code>, 404 y manejador global</td></tr>
+  <tr><td><code>src/middlewares/auth.js</code></td><td><code>requireAuth</code> y <code>requireRole</code></td></tr>
+  <tr><td><code>src/auth/index.js</code></td><td>Configuración de Better Auth: contraseña, plugins <code>bearer</code> y <code>emailOTP</code>, campo <code>role</code>, rate limit</td></tr>
+  <tr><td><code>src/mail/index.js</code></td><td>Transport de correo: consola (dev/test, guarda en <code>outbox</code>) o Resend (producción)</td></tr>
+  <tr><td><code>src/db/index.js</code></td><td>Conexión y unión de los esquemas</td></tr>
+    <tr><td><code>drizzle/</code></td><td>Migraciones SQL</td></tr>
+  <tr><td><code>src/services/</code> (marketplace)</td><td><code>categoryService</code>, <code>itemService</code>, <code>imageService</code>, <code>pricingService</code> (descuentos, totales, comisión), <code>stockService</code> (movimientos, reservas), <code>cartService</code>, <code>orderService</code>, <code>orderStateMachine</code>, <code>paymentService</code>, <code>paymentCore</code></td></tr>
+  <tr><td><code>src/payments/</code></td><td>Adaptador del proveedor de pago (<code>placeholder.js</code>): <code>createPayment</code>, <code>refund</code>, <code>verifyWebhook</code></td></tr>
+  <tr><td><code>src/db/*.js</code></td><td><code>business.js</code>, <code>catalog.js</code>, <code>inventory.js</code>, <code>orders.js</code>, <code>payments.js</code> (propias) y <code>schema.js</code> (generado)</td></tr>
+  <tr><td><code>test/</code></td><td><code>api</code>, <code>db</code>, <code>auth</code>, <code>me</code>, <code>sellers</code>, <code>profile</code>, <code>catalog</code>, <code>inventory</code>, <code>orders</code>, <code>payments</code> (<code>*.test.js</code>) y <code>helpers.js</code></td></tr>
+</table>
+
+<h3>Cómo añadir un endpoint propio</h3>
+<ol>
+  <li>Servicio en <code>src/services/</code> con la lógica y el acceso a la base de datos.</li>
+  <li>Controlador en <code>src/controllers/</code>: valida la entrada, llama al servicio y responde (los errores se lanzan como <code>HttpError</code> y los recoge <code>errorHandler</code>).</li>
+  <li>Ruta en <code>src/routes/index.js</code>, con <code>requireAuth</code> y, si hace falta, <code>requireRole('seller')</code>.</li>
+  <li>Si hay tablas nuevas: archivo propio en <code>src/db/</code>, añadirlo a <code>drizzle.config.js</code> y a <code>src/db/index.js</code>, y luego <code>npm run db:generate</code> y <code>npm run db:migrate</code>.</li>
+  <li>Prueba en <code>test/</code> con supertest.</li>
+</ol>
+
+<h3 id="modelo">Modelo relacional</h3>
+<p>PostgreSQL, 20 tablas. El diagrama entidad-relación completo, con columnas y reglas de cada tabla, está en <a href="requirements.html#er"><code>requirements.html</code></a>. Los ids son numéricos (identity); dinero en <code>bigint</code> de unidades menores.</p>
+<table>
+  <tr><th>Grupo</th><th>Tablas</th><th>Definidas en</th></tr>
+  <tr><td>Autenticación</td><td><code>user</code> (con <code>role</code> y <code>phone</code>), <code>session</code>, <code>account</code>, <code>verification</code></td><td><code>src/db/schema.js</code> (generado con <code>npm run auth:schema</code>)</td></tr>
+  <tr><td>Organización</td><td><code>organization</code> (1:1 con el usuario), <code>store</code> (1:1 con la organización; moneda, ubicación)</td><td><code>src/db/business.js</code></td></tr>
+  <tr><td>Catálogo</td><td><code>category</code> (por sucursal), <code>item</code> (con <code>current_stock</code>), <code>item_discount</code>, <code>item_image</code></td><td><code>src/db/catalog.js</code></td></tr>
+  <tr><td>Inventario</td><td><code>stock_movement</code> (libro, solo inserciones), <code>stock_reservation</code></td><td><code>src/db/inventory.js</code></td></tr>
+  <tr><td>Pedidos</td><td><code>cart</code>, <code>cart_item</code>, <code>order</code>, <code>order_item</code>, <code>order_status_history</code></td><td><code>src/db/orders.js</code></td></tr>
+  <tr><td>Pagos</td><td><code>payment</code>, <code>payment_event</code>, <code>refund</code></td><td><code>src/db/payments.js</code></td></tr>
+</table>
+<p>El esquema de auth se genera desde la configuración de Better Auth (<code>npm run auth:schema</code>) y todo se migra con Drizzle (<code>npm run db:generate</code> y <code>npm run db:migrate</code>). El generador de ids de Better Auth es <code>serial</code> (<code>advanced.database.generateId</code>).</p>
+
+<h3>Decisiones de diseño</h3>
+<ul>
+  <li><strong>Roles:</strong> uno por usuario (<code>buyer</code> | <code>seller</code>), fijado por la ruta de registro; el cliente no puede enviarlo (<code>input: false</code>). Un vendedor siempre tiene organización y sucursal. Un correo no puede ser comprador y vendedor a la vez.</li>
+  <li><strong>Login separado por rol:</strong> mismas tablas y sesiones, rutas distintas; cada login rechaza (403) las cuentas del otro rol y no deja sesión viva.</li>
+  <li><strong>Sin registro por código:</strong> las cuentas solo nacen en <code>/auth/buyer/sign-up</code> y <code>/auth/seller/sign-up</code>.</li>
+  <li><strong>Sesión móvil:</strong> token de sesión opaco y revocable de Better Auth, no JWT con refresh.</li>
+  <li><strong>Envío de correo sin <code>await</code>:</strong> evita diferencias de tiempo que revelen si un correo existe.</li>
+  <li><strong>Una sucursal por organización</strong> en el MVP (UNIQUE en <code>store.organization_id</code>); todo se trata como una sola tienda por vendedor.</li>
+  <li><strong>Stock:</strong> <code>current_stock</code> + libro de movimientos + reservas con vencimiento; los ítems se bloquean (<code>FOR UPDATE</code>) en orden para evitar interbloqueos y sobreventa.</li>
+  <li><strong>Un carrito = una sucursal = un pedido.</strong> Idempotencia por comprador (<code>Idempotency-Key</code>) en checkout y por pedido en pagos.</li>
+  <li><strong>Pagos:</strong> proveedor placeholder tras una interfaz de adaptador; la lógica de idempotencia, reservas y reembolsos es real.</li>
+  <li><strong>Sin rol admin:</strong> el usuario de la organización administra su catálogo, categorías, stock y pedidos.</li>
+</ul>
+
+<h2 id="pendiente">Pendiente</h2>
+<table>
+  <tr><th>Tema</th><th>Qué falta</th></tr>
+  <tr><td>Pagos</td><td>Elegir proveedor real y reemplazar el adaptador placeholder; liquidación al seller y conciliación</td></tr>
+  <tr><td>Producto</td><td>Notificaciones, auditoría, variantes de ítem, importación CSV, aviso de stock bajo, eliminar cuenta</td></tr>
+  <tr><td>Operación</td><td>Imágenes en un bucket (hoy disco local), rate limit compartido (Redis), proxy de confianza para IP, Resend con API key real</td></tr>
+  <tr><td>Consistencia</td><td>Unificar el formato de error de las rutas compartidas de Better Auth; definir quién absorbe la comisión; datos legales definitivos de la organización</td></tr>
+</table>
+
+<footer>Generado a partir del estado actual del código y de respuestas reales del servidor local. Detalle del avance en <code>progress.md</code> y decisiones en <code>auth-options.md</code>.</footer>
+</div>
+</body>
+</html>
