@@ -30,9 +30,19 @@ La API se despliega como un servicio desde GitHub (`api/Dockerfile`) con un serv
 | `PAYMENT_WEBHOOK_SECRET` | `${{secret(32)}}` |
 | `UPLOAD_DIR` | `/data/uploads` |
 
-Opcionales: `RESEND_API_KEY` y `MAIL_FROM` (sin ellos, en producción los códigos por correo solo salen por el log), `COMMISSION_RATE`, `RESERVATION_TTL_MINUTES`.
+Para el correo (códigos de acceso): `RESEND_API_KEY` y `MAIL_FROM`, ver la sección *Correo con Resend*. Opcionales: `COMMISSION_RATE`, `RESERVATION_TTL_MINUTES`.
 
 **Servicio Postgres:** plantilla de PostgreSQL de Railway con su volumen. La extensión `pg_trgm` la crea la migración `0006`.
+
+## Correo con Resend
+La API envía por correo los códigos de inicio de sesión, verificación y recuperación de contraseña (`src/mail/index.js`). En producción usa Resend si existe `RESEND_API_KEY`; si no, **no se entregan correos** y el arranque lo avisa en el log (el código no se imprime en producción).
+
+1. En https://resend.com/api-keys crea una clave con permiso **Sending access** y cópiala (se muestra una sola vez).
+2. En Railway, en las variables del servicio de la API, añade `RESEND_API_KEY=<la clave>`. Railway redespliega solo.
+3. `MAIL_FROM` (opcional, por defecto `Axiom <onboarding@resend.dev>`):
+   - **Sin dominio verificado**, Resend solo permite enviar desde `onboarding@resend.dev` y únicamente a la dirección del dueño de la cuenta de Resend. Sirve para probar.
+   - **Con dominio propio**: en https://resend.com/domains añade el dominio, crea en tu DNS los registros que indica (SPF, DKIM) y espera a que figure como *Verified*. Después define `MAIL_FROM=Axiom <no-reply@tudominio.com>`.
+4. Prueba: `POST /api/v1/auth/email-otp/send-verification-otp` con `{"email":"<tu correo>","type":"sign-in"}` y revisa https://resend.com/emails (cada envío aparece con su estado) y el buzón. Si el correo no llega, el error de Resend queda en el log de Railway como `[mail] send failed`.
 
 ## Comprobar el despliegue
 ```bash
