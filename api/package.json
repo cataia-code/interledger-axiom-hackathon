@@ -13,6 +13,7 @@
     "test": "NODE_ENV=test node --test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:migrate:prod": "node src/db/migrate.js",
     "db:up": "docker compose up -d db",
     "auth:schema": "auth generate --config src/auth/index.js --output src/db/schema.js -y"
   },

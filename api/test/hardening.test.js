@@ -87,3 +87,16 @@ test('search and price-order indexes exist (pg_trgm)', async () => {
   for (const name of ['item_public_price_idx', 'item_name_trgm_idx', 'item_description_trgm_idx', 'item_store_idx']) assert.ok(idx.includes(name), name);
   assert.equal((await pool.query(`select 1 from pg_extension where extname = 'pg_trgm'`)).rowCount, 1);
 });
+
+test('the error handler answers JSON even when the error carries a textual status (Better Auth)', async () => {
+  const broken = express();
+  broken.get('/x', (req, res, next) => next(Object.assign(new Error('db down'), { status: 'INTERNAL_SERVER_ERROR', statusCode: 500 })));
+  broken.get('/y', (req, res, next) => next(Object.assign(new Error('weird'), { status: 'NOPE' })));
+  broken.use(errorHandler);
+  const a = await request(broken).get('/x');
+  assert.equal(a.status, 500);
+  assert.equal(a.body.error.code, 'INTERNAL_ERROR');
+  const b = await request(broken).get('/y');
+  assert.equal(b.status, 500);
+  assert.match(b.headers['content-type'], /json/);
+});
