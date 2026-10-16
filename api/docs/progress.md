@@ -70,6 +70,10 @@ Rama: `feature/base_api_nodejs`. Decisiones de diseño en `auth-options.md`.
 - Tests: `test/sellers.test.js` ampliado. `npm test`: 32/32.
 - HTML: el diagrama del grupo Negocio muestra `organization` → `store`.
 
+## Diseño del marketplace
+
+- `docs/requirements.html`: requerimientos funcionales por módulo (catálogo con descuentos, inventario, pedidos sin envío, pagos y comisión) y modelo de base de datos propuesto, con diagrama ER y preguntas abiertas. Es solo diseño: nada de eso está implementado.
+
 ## No hecho
 
 - Envío real con Resend: el código existe pero nunca se probó con una API key real (en producción sin `RESEND_API_KEY` se usa el transport de consola).
