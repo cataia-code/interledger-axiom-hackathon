@@ -1,4 +1,12 @@
 const paths = {
+  receipt: <><path d="M7 3h18v26l-3-2-3 2-3-2-3 2-3-2-3 2z"/><path d="M12 9h8M12 14h5"/><path className="icon-accent-line" d="M12 20l3 3 6-7"/></>,
+  logout: <><path d="M14 5H5v22h9"/><path className="icon-accent-line" d="M12 16h17M22 9l7 7-7 7"/></>,
+  cart: <><path d="M2 4h5l4 18h15l4-13H8"/><path className="icon-accent-line" d="M12 13h13M15 9v9M22 9v9"/><circle cx="13" cy="28" r="2"/><circle cx="25" cy="28" r="2"/></>,
+  close: <path d="M8 8l16 16M24 8L8 24"/>,
+  plus: <path d="M16 6v20M6 16h20"/>,
+  minus: <path d="M6 16h20"/>,
+  trash: <><path d="M5 9h22M12 9V4h8v5M8 9l2 20h12l2-20"/><path className="icon-accent-line" d="M14 14v9M18 14v9"/></>,
+  list: <><path d="M12 7h16M12 16h16M12 25h16"/><circle className="icon-accent" cx="5" cy="7" r="1.5"/><circle className="icon-accent" cx="5" cy="16" r="1.5"/><circle className="icon-accent" cx="5" cy="25" r="1.5"/></>,
   shop: <> <path d="M5 14v14h22V14M12 28v-9h8v9"/><path className="icon-accent" d="M3 12l3-8h20l3 8c0 5-6 5-7 1-1 4-6 4-6 0-1 4-6 4-7 0-1 4-6 4-6-1z"/> </>,
   wallet: <> <rect x="3" y="6" width="25" height="21" rx="4"/><path d="M3 12h25M7 19h6M7 22h4"/><circle className="icon-paper" cx="24" cy="23" r="7"/><g className="icon-accent-line"><circle cx="24" cy="23" r="7"/><ellipse cx="24" cy="23" rx="3" ry="7"/><path d="M17 23h14"/></g> </>,
   people: <> <circle className="icon-accent" cx="16" cy="8" r="4"/><path className="icon-accent" d="M9 28v-6c0-10 14-10 14 0v6z"/><circle className="icon-solid" cx="5" cy="12" r="3"/><circle className="icon-solid" cx="27" cy="12" r="3"/><path className="icon-solid" d="M2 26v-6c0-4 5-5 7-2M30 26v-6c0-4-5-5-7-2"/> </>,

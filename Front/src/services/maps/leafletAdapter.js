@@ -16,7 +16,9 @@ export async function createLeafletMap(container, shops, onSelect, signal) {
     const marker = L.marker([shop.lat, shop.lng], { icon, keyboard: false, title: shop.name }).addTo(map);
     return { id: shop.id, marker, element };
   });
-  map.fitBounds(L.latLngBounds(shops.map(shop => [shop.lat, shop.lng])), { paddingTopLeft: [35, 105], paddingBottomRight: [35, 160], maxZoom: 13 });
+  let userMarker = null;
+  const bounds = shops.length ? L.latLngBounds(shops.map(shop => [shop.lat, shop.lng])) : null;
+  if (bounds) map.fitBounds(bounds, { paddingTopLeft: [35, 40], paddingBottomRight: [35, 160], maxZoom: 13 });
   const resize = new ResizeObserver(() => map.invalidateSize());
   resize.observe(container);
   return {
@@ -28,7 +30,14 @@ export async function createLeafletMap(container, shops, onSelect, signal) {
         marker.setZIndexOffset(id === selectedId ? 1000 : 0);
       });
     },
-    center() { map.setView(center, 13, { animate: !matchMedia('(prefers-reduced-motion: reduce)').matches }); },
+    updateLocation(location) {
+      if (!location) { if (userMarker) map.removeLayer(userMarker); userMarker = null; return; }
+      const icon = L.divIcon({ className: 'lokora-user-location', html: '<span></span>', iconSize: [24, 24], iconAnchor: [12, 12] });
+      if (userMarker) userMarker.setLatLng([location.lat, location.lng]);
+      else userMarker = L.marker([location.lat, location.lng], { icon, interactive: false, keyboard: false, zIndexOffset: 2000 }).addTo(map);
+    },
+    centerOn(location) { map.setView([location.lat, location.lng], 14, { animate: true }); },
+    center() { if (bounds) map.fitBounds(bounds, { padding: [40, 100], maxZoom: 13 }); else map.setView(center, 13); },
     destroy() { resize.disconnect(); tiles.off(); map.remove(); },
   };
 }

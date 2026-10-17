@@ -1,13 +1,39 @@
 import http from 'node:http';
+import https from 'node:https';
 import { existsSync, readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-if (existsSync(path.join(root, '.env')) && process.loadEnvFile) process.loadEnvFile(path.join(root, '.env'));
+if (process.loadEnvFile) { for (const filename of ['.env', '.env.local']) { const envFile = path.join(root, filename); if (existsSync(envFile)) process.loadEnvFile(envFile); } }
 const production = process.env.NODE_ENV === 'production';
 const port = Number(process.env.PORT) || 3000;
+const axiomOrigin = new URL(process.env.AXIOM_API_ORIGIN || 'https://interledger-axiom-hackathon-production.up.railway.app');
+if (!['https:', 'http:'].includes(axiomOrigin.protocol) || axiomOrigin.username || axiomOrigin.password || axiomOrigin.pathname !== '/' || axiomOrigin.search || axiomOrigin.hash) throw new Error('AXIOM_API_ORIGIN debe ser el origen HTTP(S) del backend, sin ruta ni credenciales.');
+const axiomTransport = axiomOrigin.protocol === 'https:' ? https : http;
+function proxyAxiom(request, response, pathname, search) {
+  if (!pathname.startsWith('/api/v1/')) { response.writeHead(404, { 'Content-Type': 'application/json' }); response.end(JSON.stringify({ error: { code: 'NOT_FOUND', message: 'Ruta API no disponible.' } })); return; }
+  const upstreamPath = pathname + search;
+  const upstream = axiomTransport.request(new URL(upstreamPath, axiomOrigin), {
+    method: request.method,
+    headers: Object.fromEntries(['accept', 'authorization', 'content-type', 'idempotency-key'].filter(name => request.headers[name]).map(name => [name, request.headers[name]])),
+  }, result => {
+    const responseHeaders = {};
+    for (const name of ['content-type', 'retry-after', 'cache-control']) if (result.headers[name]) responseHeaders[name] = result.headers[name];
+    response.writeHead(result.statusCode || 502, responseHeaders);
+    result.pipe(response);
+  });
+  upstream.setTimeout(25000, () => upstream.destroy(new Error('AXIOM_TIMEOUT')));
+  upstream.on('error', error => {
+    if (!response.headersSent) {
+      response.writeHead(502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      response.end(JSON.stringify({ error: { code: error.message === 'AXIOM_TIMEOUT' ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNAVAILABLE', message: 'No pudimos conectar con Axiom API. Intenta de nuevo.' } }));
+    } else response.destroy();
+  });
+  request.on('aborted', () => upstream.destroy());
+  request.pipe(upstream);
+}
 const mimeTypes = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.json': 'application/json' };
 
@@ -26,6 +52,7 @@ const server = http.createServer(async (request, response) => {
       response.end(JSON.stringify({ googleMapsApiKey: process.env.GOOGLE_MAPS_API_KEY || '' }));
       return;
     }
+    if (pathname.startsWith('/api/v1/')) { proxyAxiom(request, response, pathname, new URL(request.url, 'http://localhost').search); return; }
     if (pathname.startsWith('/api/')) { response.writeHead(404); response.end('API no disponible'); return; }
     if (vite) { vite.middlewares(request, response); return; }
     const directory = path.join(root, 'dist');

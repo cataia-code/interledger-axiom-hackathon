@@ -6,7 +6,8 @@ export function useHashNavigation() {
   useEffect(() => {
     const sync = () => setPath(readPath());
     window.addEventListener('hashchange', sync);
-    return () => window.removeEventListener('hashchange', sync);
+    window.addEventListener('popstate', sync);
+    return () => { window.removeEventListener('hashchange', sync); window.removeEventListener('popstate', sync); };
   }, []);
   function navigate(next) {
     if (next === path) return;

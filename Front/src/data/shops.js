@@ -1,4 +1,4 @@
-// Demo merchants located in Medellín. Replace this module with API data when available.
+// Mock fixtures. Consumed only by the mock repository, never directly by screens.
 export const shops = [
   {
     "id": "coffee",
@@ -12,7 +12,7 @@ export const shops = [
     "price": 16000,
     "offer": "10% de descuento",
     "logo": "/assets/shops/coffee-logo.svg",
-    "cover": "/assets/medellin-colores.png",
+    "cover": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=85",
     "area": "Laureles, Medellín",
     "lat": 6.2444,
     "lng": -75.5941,
@@ -22,19 +22,22 @@ export const shops = [
         "id": "coffee-0",
         "name": "Café de origen · 250 g",
         "price": 32000,
-        "image": "/assets/shops/coffee-product.svg"
+        "image": "/assets/shops/coffee-product.svg",
+        "photo": "https://images.unsplash.com/photo-1447933601403-0c6688de566e?auto=format&fit=crop&w=640&q=85"
       },
       {
         "id": "coffee-1",
         "name": "Filtrado de la casa",
         "price": 12000,
-        "image": "/assets/shops/coffee-product.svg"
+        "image": "/assets/shops/coffee-product.svg",
+        "photo": "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "coffee-2",
         "name": "Pan de yuca",
         "price": 8000,
-        "image": "/assets/shops/coffee-product.svg"
+        "image": "/assets/shops/coffee-product.svg",
+        "photo": "https://images.unsplash.com/photo-1509440159596-0249088772ff?auto=format&fit=crop&w=640&q=85"
       }
     ]
   },
@@ -50,7 +53,7 @@ export const shops = [
     "price": 48000,
     "offer": "15% de descuento",
     "logo": "/assets/shops/craft-logo.svg",
-    "cover": "/assets/medellin-cultura.png",
+    "cover": "https://images.unsplash.com/photo-1493106641515-6b5631de4bb9?auto=format&fit=crop&w=1200&q=85",
     "area": "San Javier · Comuna 13",
     "lat": 6.2528,
     "lng": -75.6172,
@@ -58,21 +61,24 @@ export const shops = [
     "products": [
       {
         "id": "craft-0",
-        "name": "Canasto tejido",
+        "name": "Cuenco de barro",
         "price": 85000,
-        "image": "/assets/shops/craft-product.svg"
+        "image": "/assets/shops/craft-product.svg",
+        "photo": "https://images.unsplash.com/photo-1493106641515-6b5631de4bb9?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "craft-1",
         "name": "Collar artesanal",
         "price": 60000,
-        "image": "/assets/shops/craft-product.svg"
+        "image": "/assets/shops/craft-product.svg",
+        "photo": "https://images.unsplash.com/photo-1515562141207-7a88fb7ce338?auto=format&fit=crop&w=640&q=85"
       },
       {
         "id": "craft-2",
-        "name": "Cuenco pintado a mano",
+        "name": "Jarrón artesanal",
         "price": 45000,
-        "image": "/assets/shops/craft-product.svg"
+        "image": "/assets/shops/craft-product.svg",
+        "photo": "https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=640&q=85"
       }
     ]
   },
@@ -88,7 +94,7 @@ export const shops = [
     "price": 25000,
     "offer": "2x1 en bebidas",
     "logo": "/assets/shops/food-logo.svg",
-    "cover": "/assets/medellin-colores.png",
+    "cover": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=85",
     "area": "La Candelaria · Centro",
     "lat": 6.2508,
     "lng": -75.5661,
@@ -98,19 +104,22 @@ export const shops = [
         "id": "food-0",
         "name": "Menú del día",
         "price": 28000,
-        "image": "/assets/shops/food-product.svg"
+        "image": "/assets/shops/food-product.svg",
+        "photo": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "food-1",
         "name": "Arepa de chócolo",
         "price": 14000,
-        "image": "/assets/shops/food-product.svg"
+        "image": "/assets/shops/food-product.svg",
+        "photo": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "food-2",
         "name": "Chocolate de la casa",
         "price": 9000,
-        "image": "/assets/shops/food-product.svg"
+        "image": "/assets/shops/food-product.svg",
+        "photo": "https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=85"
       }
     ]
   },
@@ -126,7 +135,7 @@ export const shops = [
     "price": 89000,
     "offer": "Envío gratis",
     "logo": "/assets/shops/roots-logo.svg",
-    "cover": "/assets/medellin-mural.png",
+    "cover": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=85",
     "area": "El Poblado · Provenza",
     "lat": 6.2087,
     "lng": -75.5671,
@@ -136,19 +145,22 @@ export const shops = [
         "id": "roots-0",
         "name": "Bolso tejido",
         "price": 145000,
-        "image": "/assets/shops/roots-product.svg"
+        "image": "/assets/shops/roots-product.svg",
+        "photo": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "roots-1",
         "name": "Pañoleta ilustrada",
         "price": 68000,
-        "image": "/assets/shops/roots-product.svg"
+        "image": "/assets/shops/roots-product.svg",
+        "photo": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "roots-2",
         "name": "Aretes de autor",
         "price": 52000,
-        "image": "/assets/shops/roots-product.svg"
+        "image": "/assets/shops/roots-product.svg",
+        "photo": "https://images.unsplash.com/photo-1483985988355-763728e1935b?auto=format&fit=crop&w=1200&q=85"
       }
     ]
   },
@@ -174,13 +186,15 @@ export const shops = [
         "id": "mural-0",
         "name": "Recorrido de graffiti",
         "price": 168000,
-        "image": "/assets/shops/mural-product.svg"
+        "image": "/assets/shops/mural-product.svg",
+        "photo": "/assets/medellin-mural.png"
       },
       {
         "id": "mural-1",
         "name": "Tour con guía local",
         "price": 112000,
-        "image": "/assets/shops/mural-product.svg"
+        "image": "/assets/shops/mural-product.svg",
+        "photo": "/assets/medellin-mural.png"
       }
     ]
   },
@@ -196,7 +210,7 @@ export const shops = [
     "price": 24000,
     "offer": "12% de descuento",
     "logo": "/assets/shops/honey-logo.svg",
-    "cover": "/assets/medellin-colores.png",
+    "cover": "https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=85",
     "area": "Envigado · Valle de Aburrá",
     "lat": 6.1707,
     "lng": -75.5853,
@@ -206,17 +220,16 @@ export const shops = [
         "id": "honey-0",
         "name": "Miel de abejas · 350 g",
         "price": 38000,
-        "image": "/assets/shops/honey-product.svg"
+        "image": "/assets/shops/honey-product.svg",
+        "photo": "https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=85"
       },
       {
         "id": "honey-1",
         "name": "Mermelada de mora",
         "price": 24000,
-        "image": "/assets/shops/honey-product.svg"
+        "image": "/assets/shops/honey-product.svg",
+        "photo": "https://images.unsplash.com/photo-1587049352851-8d4e89133924?auto=format&fit=crop&w=1200&q=85"
       }
     ]
   }
 ];
-
-export const categories = ['Todas', 'Gastronomía', 'Artesanías', 'Moda', 'Experiencias'];
-export const getShop = id => shops.find(shop => shop.id === id) ?? shops[0];

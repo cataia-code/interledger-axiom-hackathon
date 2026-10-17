@@ -1,18 +1,18 @@
+import { useTranslation } from '../i18n/useTranslation';
+import { DATA_SOURCE } from '../services/api/client';
 import { useApp } from '../context/AppContext';
 import PageHeading, { SectionHeading } from '../components/ui/PageHeading';
 import RowLink from '../components/ui/RowLink';
 import { Button } from '../components/ui/Button';
-import { money } from '../lib/currency';
 export default function ProfilePage() {
-  const { navigate, balanceUSD, setDialog } = useApp();
-  return <><PageHeading eyebrow="CUENTA LOKORA" title="Hola, Lucía" description="Tu viaje, tu wallet y tu impacto en un solo lugar." />
-    <div className="surface profile-summary"><span className="profile-avatar">LM</span><span><b>Lucía Martínez</b><small>Viajera exploradora · USD</small></span><Button variant="quiet" onClick={() => setDialog({ title: 'Tu perfil', description: 'Esta es una cuenta de ejemplo para recorrer Lokora.' })}>Editar</Button></div>
-    <SectionHeading title="Mi espacio" /><div className="link-list">{[
-      ['wallet', 'wallet', 'Mi wallet', `Saldo disponible · ${money(balanceUSD, 'USD')}`],
-      ['seller', 'shop', 'Panel del vendedor', 'Gestiona tu tienda Lokora'],
-      ['stats', 'growth', 'Estadísticas de ventas', 'Revisa tus resultados'],
-      ['scheduled', 'bank', 'Pagos programados', 'Frecuencia y cuenta de abono'],
-      ['settings', 'settings', 'Configuración de pagos', 'Ajusta pagos y notificaciones'],
-    ].map(([route, icon, title, description]) => <RowLink key={route} icon={icon} title={title} description={description} onClick={() => navigate(route)} />)}</div><Button variant="outline" className="wide space-top" onClick={() => navigate('welcome')}>Cerrar sesión</Button>
+  const { t } = useTranslation();
+  const { navigate, user, ownedShop, createMyStore } = useApp();
+  const seller = user?.role === 'seller';
+  const name = user?.name || 'viajero';
+  const initials = name.split(' ').filter(Boolean).slice(0, 2).map(word => word[0].toUpperCase()).join('');
+  return <><PageHeading eyebrow={seller ? 'CUENTA DE VENDEDOR' : 'CUENTA DE COMPRADOR'} title={t('Hola, {{name}}', { name: name.split(' ')[0] })} description={seller ? 'Gestiona tu sucursal y sus pedidos.' : 'Descubre tiendas y revisa tus compras locales.'} />
+    <div className="surface profile-summary"><span className="profile-avatar">{initials}</span><span><b>{name}</b><small>{user?.email}</small></span></div>
+    {seller ? <><SectionHeading title={t("Mi negocio")} /><div className="link-list">{ownedShop ? <><RowLink icon="shop" title={ownedShop.name} description={t("Gestiona tu sucursal")} onClick={() => navigate('seller')} /><RowLink icon="ticket" title={t("Cupones de mi tienda")} onClick={() => navigate('sellerCoupons')} /><RowLink icon="wallet" title={t("Wallets de mi negocio")} description={t("Revisa tu wallet y moneda de recepción")} onClick={() => navigate('wallets')} /><RowLink icon="settings" title={t("Editar mi tienda")} onClick={() => navigate('createStore')} /><RowLink icon="growth" title={t("Estadísticas de ventas")} onClick={() => navigate('stats')} /></> : <RowLink icon="shop" title={t("Mi tienda")} description={t("Configura tu negocio")} onClick={createMyStore} />}</div></> : <><SectionHeading title={t("Mis compras")} /><div className="link-list"><RowLink icon="wallet" title={t("Mis compras")} description={t("Tus comprobantes en comercios locales")} onClick={() => navigate('wallet')} /><RowLink icon="wallet" title={t("Mis wallets")} description={t("Agrega y organiza tus direcciones de Open Payments")} onClick={() => navigate('wallets')} /><RowLink icon="search" title={t("Descubrir tiendas")} onClick={() => navigate('home/list')} /></div></>}
+    {DATA_SOURCE === 'api' && !user?.emailVerified && <Button className="wide space-top" variant="secondary" onClick={() => navigate('verifyEmail')}>{t("Verificar mi correo")}</Button>}
   </>;
 }

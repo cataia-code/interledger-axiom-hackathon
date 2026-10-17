@@ -1,0 +1,15 @@
+.language-selector { position: relative; isolation: isolate; display: inline-flex; align-items: center; flex: 0 0 auto; padding: 2px; gap: 0; border: 1px solid var(--line); border-radius: 28px; background: var(--paper); }
+.language-selector__indicator { position: absolute; z-index: -1; top: 2px; bottom: 2px; left: 2px; width: 28px; border-radius: 22px; background: var(--teal); box-shadow: 0 2px 5px #1e3a5214; transition: transform .22s var(--ease); }
+.language-selector[data-language="en"] .language-selector__indicator { transform: translateX(28px); }
+.language-selector button { width: 28px; min-height: 30px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; padding: 3px; border: 0; border-radius: 22px; color: var(--muted); background: transparent; font: 600 7px/1.2 var(--font-body, sans-serif); cursor: pointer; transition: color .18s; }
+.language-selector button[aria-pressed="true"] { color: white; }
+.language-selector button:hover { color: var(--navy); }
+.language-selector button[aria-pressed="true"]:hover { color: white; }
+.language-selector button:focus-visible { outline: 2px solid var(--wine); outline-offset: 2px; }
+.language-selector img { display: block; width: 18px; height: 12px; object-fit: cover; border-radius: 2px; box-shadow: 0 0 0 1px #ffffff60; }
+.language-selector--compact { position: absolute; right: 0; top: 18px; z-index: 3; }
+.welcome > .language-selector--compact { right: 18px; top: 18px; }
+.account-page__top { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 25px; }
+.account-page__top > .brand-logo { width: clamp(98px, 30vw, 160px); height: 55px; flex-shrink: 1; min-width: 0; }
+.account-page__top > .icon-button { flex-shrink: 0; }
+@media (prefers-reduced-motion: reduce) { .language-selector__indicator, .language-selector button { transition: none; } }

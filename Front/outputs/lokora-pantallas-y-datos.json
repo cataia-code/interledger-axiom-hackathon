@@ -1,0 +1,2202 @@
+{
+  "title": "Lokora · Pantallas y datos para backend",
+  "version": "2026-10-16",
+  "scope": "Inventario de código actual; vistas esquemáticas reconstruidas, no capturas de la aplicación. Todos los ejemplos son ficticios.",
+  "basePath": "/api/v1",
+  "screens": [
+    {
+      "id": "01",
+      "title": "Bienvenida",
+      "route": "welcome",
+      "role": "Público",
+      "status": "Local",
+      "source": "src/pages/WelcomePage.jsx",
+      "preview": [
+        "Go global, grow local",
+        "Crear cuenta",
+        "Iniciar sesión"
+      ],
+      "fields": [
+        {
+          "field": "logo / ilustración / textos",
+          "type": "assets / i18n",
+          "origin": "Local",
+          "rule": "Recursos del frontend; no requieren endpoint"
+        }
+      ],
+      "endpoints": [],
+      "examples": {},
+      "note": "No muestra catálogo sin iniciar sesión.",
+      "states": "Listo"
+    },
+    {
+      "id": "02",
+      "title": "Inicio de sesión con contraseña",
+      "route": "login",
+      "role": "Público",
+      "status": "API",
+      "source": "src/pages/auth/AccountPage.jsx",
+      "preview": [
+        "Qué bueno verte de nuevo",
+        "Correo electrónico",
+        "Contraseña",
+        "Iniciar sesión"
+      ],
+      "fields": [
+        {
+          "field": "email / password",
+          "type": "string",
+          "origin": "Entrada",
+          "rule": "Email válido; contraseña mín. 8 en interfaz"
+        },
+        {
+          "field": "user.id / name / email / role",
+          "type": "string / enum",
+          "origin": "Actual",
+          "rule": "role=buyer|seller; cuenta separada por rol"
+        },
+        {
+          "field": "user.emailVerified / phone",
+          "type": "boolean / string|null",
+          "origin": "Actual",
+          "rule": "No exigir verificación para entrar"
+        }
+      ],
+      "endpoints": [
+        "POST /auth/{buyer|seller}/sign-in",
+        "GET /me"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        }
+      },
+      "note": "No volver a pedir comprar/vender. Reintentar el otro rol solo ante 403 WRONG_ROLE. Respuesta auth contiene token opaco.",
+      "states": "Enviando · credenciales inválidas · WRONG_ROLE · 429 · error de conexión"
+    },
+    {
+      "id": "03",
+      "title": "Inicio de sesión con código",
+      "route": "login → método OTP",
+      "role": "Público",
+      "status": "API",
+      "source": "src/components/auth/OTPLoginForm.jsx",
+      "preview": [
+        "Con código por correo",
+        "alex@example.com",
+        "Código de 6 dígitos",
+        "Enviar código · Iniciar sesión"
+      ],
+      "fields": [
+        {
+          "field": "email / type",
+          "type": "string / enum",
+          "origin": "Entrada",
+          "rule": "type=sign-in"
+        },
+        {
+          "field": "otp",
+          "type": "string",
+          "origin": "Entrada",
+          "rule": "6 dígitos; no registrar ni devolver código en respuesta"
+        },
+        {
+          "field": "Retry-After",
+          "type": "header",
+          "origin": "Actual",
+          "rule": "Respetar rate limit y reenvío"
+        }
+      ],
+      "endpoints": [
+        "POST /auth/email-otp/send-verification-otp",
+        "POST /auth/{buyer|seller}/sign-in/otp",
+        "GET /me"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        }
+      },
+      "note": "Envío solo por acción del usuario. Contrato: caduca en 10 min y permite 3 intentos.",
+      "states": "Sin código · envío · cuenta atrás · código inválido/caducado · 429"
+    },
+    {
+      "id": "04",
+      "title": "Registro de comprador",
+      "route": "register → buy",
+      "role": "Público",
+      "status": "API",
+      "source": "src/pages/auth/AccountPage.jsx",
+      "preview": [
+        "Tu viaje empieza aquí",
+        "Comprar local",
+        "Nombre · correo · contraseña",
+        "Crear mi cuenta"
+      ],
+      "fields": [
+        {
+          "field": "name / email / password",
+          "type": "string",
+          "origin": "Entrada",
+          "rule": "Nombre mín. 2 en UI; contraseña mín. 8"
+        },
+        {
+          "field": "user.id / name / email / role",
+          "type": "string / enum",
+          "origin": "Actual",
+          "rule": "role=buyer|seller; cuenta separada por rol"
+        },
+        {
+          "field": "user.emailVerified / phone",
+          "type": "boolean / string|null",
+          "origin": "Actual",
+          "rule": "No exigir verificación para entrar"
+        }
+      ],
+      "endpoints": [
+        "POST /auth/buyer/sign-up",
+        "GET /me"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        }
+      },
+      "note": "El registro no asigna fondos ni crea una wallet. Entrada directa después del registro; verificación opcional.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "05",
+      "title": "Registro de vendedor",
+      "route": "register → sell",
+      "role": "Público",
+      "status": "API",
+      "source": "src/components/auth/SellerRegistrationFields.jsx",
+      "preview": [
+        "Tu organización y sucursal",
+        "Razón social · identificación fiscal",
+        "Dirección legal · país",
+        "Sucursal · moneda · coordenadas"
+      ],
+      "fields": [
+        {
+          "field": "name / email / password",
+          "type": "string",
+          "origin": "Entrada",
+          "rule": "Cuenta seller"
+        },
+        {
+          "field": "organization.legalName / tradeName",
+          "type": "string / string?",
+          "origin": "Actual",
+          "rule": "2–120 caracteres; tradeName opcional"
+        },
+        {
+          "field": "organization.taxId / legalId / country / legalAddress",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "IDs únicos 3–40; ISO país 2; dirección 5–200"
+        },
+        {
+          "field": "store.name / legalId / address / city",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Nombre 2–80; ID 3–40; dirección 5–200; ciudad 2–80"
+        },
+        {
+          "field": "store.currency / latitude / longitude",
+          "type": "ISO4217 / number",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; lat ±90, lon ±180"
+        }
+      ],
+      "endpoints": [
+        "POST /auth/seller/sign-up",
+        "GET /me"
+      ],
+      "examples": {
+        "sellerRegistration": {
+          "email": "alba@example.com",
+          "password": "<contraseña introducida por la persona>",
+          "name": "Alba Demo",
+          "organization": {
+            "legalName": "Café Alba Demo SAS",
+            "tradeName": "Café Alba",
+            "taxId": "DEMO-NIT-001",
+            "legalId": "DEMO-ORG-001",
+            "country": "CO",
+            "legalAddress": "Carrera 70 # 44-10, Medellín"
+          },
+          "store": {
+            "name": "Café Alba Medellín",
+            "legalId": "DEMO-SUC-001",
+            "address": "Carrera 70 # 44-10",
+            "city": "Medellín",
+            "currency": "COP",
+            "latitude": 6.2442,
+            "longitude": -75.5812
+          }
+        }
+      },
+      "note": "Crea persona, organización y una sucursal en una sola petición. No existe POST /stores en el contrato.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "06",
+      "title": "Verificación opcional de correo",
+      "route": "verifyEmail",
+      "role": "Autenticado",
+      "status": "API",
+      "source": "src/pages/auth/VerifyEmailPage.jsx",
+      "preview": [
+        "Verifica tu correo",
+        "Enviar código",
+        "Código de verificación",
+        "Verificar correo"
+      ],
+      "fields": [
+        {
+          "field": "user.email / emailVerified",
+          "type": "string / boolean",
+          "origin": "Actual",
+          "rule": "Correo de la sesión"
+        },
+        {
+          "field": "email / otp / type",
+          "type": "string",
+          "origin": "Entrada",
+          "rule": "type=email-verification; seis dígitos"
+        }
+      ],
+      "endpoints": [
+        "POST /auth/email-otp/send-verification-otp",
+        "POST /auth/email-otp/verify-email",
+        "GET /me"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        }
+      },
+      "note": "Accesible desde perfil; no bloquear la aplicación por correo no verificado.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "07",
+      "title": "Inicio con mapa",
+      "route": "home/map; map",
+      "role": "Autenticado",
+      "status": "Parcial",
+      "source": "src/pages/HomePage.jsx",
+      "preview": [
+        "Tus compras · sin saldo",
+        "Buscar tiendas, productos o categorías",
+        "Medellín · mapa y pines",
+        "Café Alba · $18.000 COP"
+      ],
+      "fields": [
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        },
+        {
+          "field": "store.category / rating / reviews",
+          "type": "string / number / integer",
+          "origin": "Pendiente",
+          "rule": "Clasificación global y puntuación no existen en el contrato"
+        },
+        {
+          "field": "minPrice / distancia / favoritos",
+          "type": "number / number / ids",
+          "origin": "Derivado",
+          "rule": "Precio mínimo desde productos; distancia local opcional; favoritos locales"
+        }
+      ],
+      "endpoints": [
+        "GET /stores?limit=&cursor=",
+        "GET /items?limit=&cursor="
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        },
+        "storeExtras": {
+          "iconUrl": "/uploads/stores/3/icon-demo.webp",
+          "bannerUrl": "/uploads/stores/3/banner-demo.webp"
+        },
+        "items": {
+          "items": [
+            {
+              "id": 8,
+              "storeId": 3,
+              "categoryId": 4,
+              "sku": "DEMO-001",
+              "name": "Café de origen 250 g",
+              "description": "Notas de chocolate y caramelo.",
+              "priceAmount": 2000000,
+              "currency": "COP",
+              "discount": {
+                "id": 3,
+                "type": "percent",
+                "value": 1000,
+                "startsAt": "2026-10-01T00:00:00Z",
+                "endsAt": "2026-12-31T23:59:59Z",
+                "active": true
+              },
+              "discountAmount": 200000,
+              "finalPriceAmount": 1800000,
+              "available": 12,
+              "images": [
+                {
+                  "id": 18,
+                  "url": "/uploads/demo/cafe.webp",
+                  "width": 1024,
+                  "height": 1024,
+                  "position": 0
+                }
+              ],
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "Directorio disponible en GET /stores con {stores,nextCursor}. bannerUrl es la portada e iconUrl el logo. Se complementa con productos para precios; también incluye tiendas sin productos. Mapa Google con clave o proveedor alternativo.",
+      "states": "Carga · sin tiendas · error · tienda sin coordenadas · listo"
+    },
+    {
+      "id": "08",
+      "title": "Inicio como listado",
+      "route": "home/list; explore",
+      "role": "Autenticado",
+      "status": "Parcial",
+      "source": "src/components/shops/ShopCard.jsx",
+      "preview": [
+        "Tiendas para descubrir",
+        "Lista | Mapa",
+        "Café Alba Medellín · 4,8 ★",
+        "Logo · portada · categoría"
+      ],
+      "fields": [
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        },
+        {
+          "field": "store.category / rating / reviews",
+          "type": "string / number / integer",
+          "origin": "Pendiente",
+          "rule": "Clasificación global y puntuación no existen en el contrato"
+        },
+        {
+          "field": "q / category / favoriteIds",
+          "type": "string / string / array",
+          "origin": "Local",
+          "rule": "Búsqueda actual sobre datos cargados; favoritos en cliente"
+        }
+      ],
+      "endpoints": [
+        "GET /stores?limit=&cursor=",
+        "GET /items?limit=&cursor="
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        },
+        "storeExtras": {
+          "iconUrl": "/uploads/stores/3/icon-demo.webp",
+          "bannerUrl": "/uploads/stores/3/banner-demo.webp"
+        }
+      },
+      "note": "Comparte datos y filtros con el mapa. bannerUrl/iconUrl son entregados por backend; valoración no viene en la respuesta compartida.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "09",
+      "title": "Tienda: productos",
+      "route": "store/:id → Productos",
+      "role": "Autenticado",
+      "status": "Parcial",
+      "source": "src/pages/StorePage.jsx",
+      "preview": [
+        "Café Alba Medellín · 4,8 ★",
+        "Café de origen y artesanía local",
+        "Productos | Información | Reseñas",
+        "Café 250 g · $18.000 · añadir al tocar"
+      ],
+      "fields": [
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        },
+        {
+          "field": "store.category / rating / reviews",
+          "type": "string / number / integer",
+          "origin": "Pendiente",
+          "rule": "Clasificación global y puntuación no existen en el contrato"
+        },
+        {
+          "field": "item.id / storeId / categoryId / sku",
+          "type": "id / id / id|null / string",
+          "origin": "Actual",
+          "rule": "Asociar producto a sucursal y categoría"
+        },
+        {
+          "field": "item.name / description",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Contenido original; traducción de catálogo pendiente"
+        },
+        {
+          "field": "priceAmount / discountAmount / finalPriceAmount",
+          "type": "integer",
+          "origin": "Actual",
+          "rule": "Unidades menores; mostrar finalPriceAmount"
+        },
+        {
+          "field": "item.currency / available",
+          "type": "ISO4217 / integer",
+          "origin": "Actual",
+          "rule": "Agotado: no añadir"
+        },
+        {
+          "field": "item.images[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "id,url,width,height,position; portada por orden"
+        },
+        {
+          "field": "categories[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "id,storeId,parentId,name,slug"
+        }
+      ],
+      "endpoints": [
+        "GET /stores/:id",
+        "GET /items?storeId=:id&cursor=",
+        "GET /stores/:id/categories",
+        "PUT /cart/items/:itemId"
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        },
+        "items": {
+          "items": [
+            {
+              "id": 8,
+              "storeId": 3,
+              "categoryId": 4,
+              "sku": "DEMO-001",
+              "name": "Café de origen 250 g",
+              "description": "Notas de chocolate y caramelo.",
+              "priceAmount": 2000000,
+              "currency": "COP",
+              "discount": {
+                "id": 3,
+                "type": "percent",
+                "value": 1000,
+                "startsAt": "2026-10-01T00:00:00Z",
+                "endsAt": "2026-12-31T23:59:59Z",
+                "active": true
+              },
+              "discountAmount": 200000,
+              "finalPriceAmount": 1800000,
+              "available": 12,
+              "images": [
+                {
+                  "id": 18,
+                  "url": "/uploads/demo/cafe.webp",
+                  "width": 1024,
+                  "height": 1024,
+                  "position": 0
+                }
+              ],
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        },
+        "categories": {
+          "categories": [
+            {
+              "id": 4,
+              "storeId": 3,
+              "parentId": null,
+              "name": "Café",
+              "slug": "cafe"
+            }
+          ]
+        }
+      },
+      "note": "La tarjeta añade al carrito para buyer; seller consulta catálogo sin comprar. No existe una pantalla independiente de detalle de producto.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "10",
+      "title": "Tienda: información",
+      "route": "store/:id → Información",
+      "role": "Autenticado",
+      "status": "API",
+      "source": "src/pages/StorePage.jsx",
+      "preview": [
+        "Nos encuentras aquí",
+        "Carrera 70 # 44-10 · Medellín",
+        "Café de origen y artesanía local"
+      ],
+      "fields": [
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        }
+      ],
+      "endpoints": [
+        "GET /stores/:id"
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        }
+      },
+      "note": "Teléfono, horarios y redes no se muestran actualmente; no son requisitos de esta vista.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "11",
+      "title": "Tienda: reseñas",
+      "route": "store/:id → Reseñas",
+      "role": "Autenticado",
+      "status": "Demo",
+      "source": "src/pages/StorePage.jsx",
+      "preview": [
+        "4,8 ★ · 128 reseñas",
+        "“Excelente café local”",
+        "Viajero Demo"
+      ],
+      "fields": [
+        {
+          "field": "rating / reviewCount",
+          "type": "number / integer",
+          "origin": "Pendiente",
+          "rule": "Definir promedio, escala 1–5 y total"
+        },
+        {
+          "field": "reviews[]",
+          "type": "array",
+          "origin": "Pendiente",
+          "rule": "La UI mock usa una reseña fija; listado real requiere autor público, rating, comentario, fecha"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint actual; acordar consulta de reseñas"
+      ],
+      "examples": {
+        "reviews": {
+          "rating": 4.8,
+          "reviewCount": 128,
+          "reviews": [
+            {
+              "id": "r-1",
+              "storeId": 3,
+              "authorDisplayName": "Viajero Demo",
+              "rating": 5,
+              "comment": "Excelente café local.",
+              "createdAt": "2026-10-15T16:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "La API no ofrece reseñas ni puntuación. Mostrar «sin puntuación» hasta tener datos.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "12",
+      "title": "Carrito global desplegable",
+      "route": "Modal global",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/components/cart/CartDrawer.jsx",
+      "preview": [
+        "Tu carrito · 2 productos",
+        "Ver carrito completo",
+        "Café 250 g · 2 × $18.000",
+        "Total $36.000 COP · Ir a pagar"
+      ],
+      "fields": [
+        {
+          "field": "cart.storeId / currency",
+          "type": "id / ISO4217",
+          "origin": "Actual",
+          "rule": "Una sucursal por carrito"
+        },
+        {
+          "field": "cart.lines[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "itemId,name,sku,quantity,unitAmount,lineAmount,available,purchasable"
+        },
+        {
+          "field": "cart.*Amount",
+          "type": "integer",
+          "origin": "Por confirmar",
+          "rule": "Acordar nombres exactos de totales; documento dice «…totales»"
+        },
+        {
+          "field": "miniatura del producto",
+          "type": "URL",
+          "origin": "Derivado",
+          "rule": "Resolver desde catálogo o GET /items/:id"
+        }
+      ],
+      "endpoints": [
+        "GET /cart",
+        "PUT /cart/items/:itemId",
+        "DELETE /cart/items/:itemId",
+        "DELETE /cart"
+      ],
+      "examples": {
+        "cart": {
+          "cart": {
+            "id": 10,
+            "storeId": 3,
+            "currency": "COP",
+            "lines": [
+              {
+                "itemId": 8,
+                "name": "Café de origen 250 g",
+                "sku": "DEMO-001",
+                "quantity": 2,
+                "originalUnitAmount": 2000000,
+                "discountUnitAmount": 200000,
+                "unitAmount": 1800000,
+                "lineAmount": 3600000,
+                "available": 12,
+                "purchasable": true
+              }
+            ],
+            "subtotalAmount": 4000000,
+            "discountAmount": 400000,
+            "totalAmount": 3600000
+          }
+        },
+        "items": {
+          "items": [
+            {
+              "id": 8,
+              "storeId": 3,
+              "categoryId": 4,
+              "sku": "DEMO-001",
+              "name": "Café de origen 250 g",
+              "description": "Notas de chocolate y caramelo.",
+              "priceAmount": 2000000,
+              "currency": "COP",
+              "discount": {
+                "id": 3,
+                "type": "percent",
+                "value": 1000,
+                "startsAt": "2026-10-01T00:00:00Z",
+                "endsAt": "2026-12-31T23:59:59Z",
+                "active": true
+              },
+              "discountAmount": 200000,
+              "finalPriceAmount": 1800000,
+              "available": 12,
+              "images": [
+                {
+                  "id": 18,
+                  "url": "/uploads/demo/cafe.webp",
+                  "width": 1024,
+                  "height": 1024,
+                  "position": 0
+                }
+              ],
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "Visible globalmente para comprador. Control +/- y miniaturas; conflicto con otra tienda requiere decisión del usuario.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "13",
+      "title": "Carrito completo",
+      "route": "cart",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/pages/CartPage.jsx",
+      "preview": [
+        "Tu carrito",
+        "Café Alba Medellín",
+        "Café de origen 250 g · cantidad 2",
+        "Total $36.000 COP · Ir a pagar"
+      ],
+      "fields": [
+        {
+          "field": "cart.storeId / currency",
+          "type": "id / ISO4217",
+          "origin": "Actual",
+          "rule": "Una sucursal por carrito"
+        },
+        {
+          "field": "cart.lines[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "itemId,name,sku,quantity,unitAmount,lineAmount,available,purchasable"
+        },
+        {
+          "field": "cart.*Amount",
+          "type": "integer",
+          "origin": "Por confirmar",
+          "rule": "Acordar nombres exactos de totales; documento dice «…totales»"
+        },
+        {
+          "field": "miniatura del producto",
+          "type": "URL",
+          "origin": "Derivado",
+          "rule": "Resolver desde catálogo o GET /items/:id"
+        }
+      ],
+      "endpoints": [
+        "GET /cart",
+        "PUT /cart/items/:itemId",
+        "DELETE /cart/items/:itemId",
+        "DELETE /cart"
+      ],
+      "examples": {
+        "cart": {
+          "cart": {
+            "id": 10,
+            "storeId": 3,
+            "currency": "COP",
+            "lines": [
+              {
+                "itemId": 8,
+                "name": "Café de origen 250 g",
+                "sku": "DEMO-001",
+                "quantity": 2,
+                "originalUnitAmount": 2000000,
+                "discountUnitAmount": 200000,
+                "unitAmount": 1800000,
+                "lineAmount": 3600000,
+                "available": 12,
+                "purchasable": true
+              }
+            ],
+            "subtotalAmount": 4000000,
+            "discountAmount": 400000,
+            "totalAmount": 3600000
+          }
+        }
+      },
+      "note": "Sin saldo. Doble moneda solo ilustrativa en mock; la API actual devuelve moneda de tienda.",
+      "states": "Vacío · actualizando · stock insuficiente · CART_OTHER_STORE · producto no comprable"
+    },
+    {
+      "id": "14",
+      "title": "Revisión de compra y pago actual",
+      "route": "payment → API",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/pages/ApiCheckoutPage.jsx",
+      "preview": [
+        "Revisa tu compra",
+        "Miniatura · Café 250 g × 2",
+        "TOTAL A PAGAR · $36.000 COP",
+        "Pagar"
+      ],
+      "fields": [
+        {
+          "field": "order.id / number / storeId / buyerId",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Identificadores del comprobante"
+        },
+        {
+          "field": "order.status / expiresAt / createdAt",
+          "type": "enum / ISO8601",
+          "origin": "Actual",
+          "rule": "pending_payment,paid,preparing,completed,cancelled,refunded"
+        },
+        {
+          "field": "order.currency / *Amount / commissionRate",
+          "type": "ISO4217 / integer",
+          "origin": "Actual",
+          "rule": "Precios congelados y total desde servidor; confirmar escala de commissionRate"
+        },
+        {
+          "field": "order.items[] / history[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "Solo en detalle; no en listado"
+        },
+        {
+          "field": "Idempotency-Key",
+          "type": "header",
+          "origin": "Entrada",
+          "rule": "UUID distinto para crear/pagar; mismo al reintentar"
+        },
+        {
+          "field": "miniatura",
+          "type": "URL",
+          "origin": "Derivado",
+          "rule": "Catálogo o GET /items/:id"
+        }
+      ],
+      "endpoints": [
+        "POST /orders",
+        "GET /orders/:id",
+        "POST /orders/:id/pay",
+        "POST /orders/:id/cancel"
+      ],
+      "examples": {
+        "order": {
+          "order": {
+            "id": 501,
+            "number": "LK-0501",
+            "buyerId": 101,
+            "storeId": 3,
+            "status": "pending_payment",
+            "currency": "COP",
+            "subtotalAmount": 4000000,
+            "discountAmount": 400000,
+            "totalAmount": 3600000,
+            "commissionRate": 300,
+            "commissionAmount": 108000,
+            "expiresAt": "2026-10-16T14:15:00Z",
+            "createdAt": "2026-10-16T14:00:00Z",
+            "items": [
+              {
+                "itemId": 8,
+                "name": "Café de origen 250 g",
+                "sku": "DEMO-001",
+                "quantity": 2,
+                "originalUnitAmount": 2000000,
+                "discountUnitAmount": 200000,
+                "unitAmount": 1800000,
+                "lineAmount": 3600000
+              }
+            ],
+            "history": [
+              {
+                "from": null,
+                "to": "pending_payment",
+                "actorId": 101,
+                "note": null,
+                "at": "2026-10-16T14:00:00Z"
+              }
+            ]
+          }
+        },
+        "payments": {
+          "payments": [
+            {
+              "id": 901,
+              "orderId": 501,
+              "provider": "placeholder",
+              "providerRef": "demo-901",
+              "status": "pending",
+              "amount": 3600000,
+              "currency": "COP",
+              "createdAt": "2026-10-16T14:01:00Z",
+              "refunds": []
+            }
+          ]
+        }
+      },
+      "note": "Pago placeholder. Pagar crea el pedido y solicita pago; polling cada 4 s. Un total distinto exige nueva confirmación. La respuesta de /pay no prueba cobro.",
+      "states": "Procesando · pendiente · esperando confirmación · total cambió · cancelado · reembolsado · error"
+    },
+    {
+      "id": "15",
+      "title": "Wallet y cotización internacional",
+      "route": "payment → mock",
+      "role": "Buyer",
+      "status": "Demo",
+      "source": "src/pages/PaymentPage.jsx",
+      "preview": [
+        "TÚ PAGAS US$9,00",
+        "LA TIENDA RECIBE $36.000 COP",
+        "1 USD = 4.000 COP · ejemplo",
+        "Wallet Open Payments · nota · autorizar"
+      ],
+      "fields": [
+        {
+          "field": "paymentWallet.address / assetCode / status",
+          "type": "string / ISO4217 / enum",
+          "origin": "Pendiente",
+          "rule": "Payment Pointer o dirección HTTPS; no saldo"
+        },
+        {
+          "field": "quote.debitAmount / receiveAmount / feeAmount",
+          "type": "integer",
+          "origin": "Pendiente",
+          "rule": "Cada importe con moneda y escala explícita"
+        },
+        {
+          "field": "quote.rate / expiresAt / authorizationUrl",
+          "type": "number / ISO8601 / URL",
+          "origin": "Pendiente",
+          "rule": "Cotización firme del proveedor; retorno y seguimiento verificados"
+        },
+        {
+          "field": "note",
+          "type": "string",
+          "origin": "Local",
+          "rule": "Máx. 140 caracteres; API actual de pago no recibe nota"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint actual de wallet o FX; contrato por acordar"
+      ],
+      "examples": {
+        "wallet": {
+          "paymentWallet": {
+            "address": "https://wallet.example/alex",
+            "paymentPointer": "$wallet.example/alex",
+            "assetCode": "USD",
+            "assetScale": 2,
+            "status": "connected"
+          }
+        },
+        "quote": {
+          "id": "quote-demo-1",
+          "orderId": 501,
+          "debitAmount": 900,
+          "debitCurrency": "USD",
+          "debitScale": 2,
+          "receiveAmount": 3600000,
+          "receiveCurrency": "COP",
+          "receiveScale": 2,
+          "rate": 4000,
+          "rateMeaning": "COP por USD",
+          "feeAmount": 0,
+          "feeCurrency": "USD",
+          "expiresAt": "2026-10-16T14:05:00Z",
+          "status": "ready",
+          "authorizationUrl": "https://wallet.example/authorize/demo"
+        }
+      },
+      "note": "Los nombres JSON son propuestas, no endpoints implementados. Acordar si debitAmount incluye comisión. 9 USD = 36.000 COP con comisión 0 en este ejemplo. No usar tasa mock para cobros reales.",
+      "states": "Sin wallet · conectando · cotizando · cotización vencida · autorización · error proveedor"
+    },
+    {
+      "id": "16",
+      "title": "Escáner QR y cercanía",
+      "route": "scanner",
+      "role": "Buyer",
+      "status": "Demo",
+      "source": "src/pages/ScannerPage.jsx",
+      "preview": [
+        "Escanea el código QR de la tienda",
+        "Marco de cámara",
+        "Consultar mi cercanía",
+        "Revisar compra"
+      ],
+      "fields": [
+        {
+          "field": "checkoutShopId / tienda",
+          "type": "id / Store",
+          "origin": "Actual",
+          "rule": "Debe existir carrito/tienda seleccionada"
+        },
+        {
+          "field": "camera / location.accuracy / latitude / longitude",
+          "type": "dispositivo",
+          "origin": "Local",
+          "rule": "Permiso explícito; ubicación no se envía ni guarda"
+        },
+        {
+          "field": "QR firmado / expiración",
+          "type": "string / ISO8601",
+          "origin": "Pendiente",
+          "rule": "El QR actual es de muestra; no hay decodificación/validación implementada"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint QR actual"
+      ],
+      "examples": {
+        "location": {
+          "latitude": 6.244,
+          "longitude": -75.581,
+          "accuracy": 25,
+          "timestamp": "2026-10-16T14:00:00Z"
+        },
+        "qr": {
+          "storeId": 3,
+          "payload": "<formato firmado por definir>",
+          "expiresAt": "2026-10-16T14:05:00Z"
+        }
+      },
+      "note": "GPS solo estima distancia, no verifica presencia. Si se exige compra presencial, backend debe definir verificación segura.",
+      "states": "Sin tienda · permiso denegado · cámara activa · GPS no disponible · precisión insuficiente"
+    },
+    {
+      "id": "17",
+      "title": "Confirmación de pago",
+      "route": "success",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/pages/PaymentSuccessPage.jsx",
+      "preview": [
+        "¡Pago confirmado!",
+        "Tu compra apoya a Café Alba",
+        "La tienda recibe $36.000 COP",
+        "Seguir explorando · Ver mis compras"
+      ],
+      "fields": [
+        {
+          "field": "order.id / number / storeId / buyerId",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Identificadores del comprobante"
+        },
+        {
+          "field": "order.status / expiresAt / createdAt",
+          "type": "enum / ISO8601",
+          "origin": "Actual",
+          "rule": "pending_payment,paid,preparing,completed,cancelled,refunded"
+        },
+        {
+          "field": "order.currency / *Amount / commissionRate",
+          "type": "ISO4217 / integer",
+          "origin": "Actual",
+          "rule": "Precios congelados y total desde servidor; confirmar escala de commissionRate"
+        },
+        {
+          "field": "order.items[] / history[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "Solo en detalle; no en listado"
+        },
+        {
+          "field": "debitAmount / debitCurrency",
+          "type": "integer / ISO4217",
+          "origin": "Pendiente",
+          "rule": "Mostrar débito externo solo cuando backend lo confirme"
+        }
+      ],
+      "endpoints": [
+        "GET /orders/:id"
+      ],
+      "examples": {
+        "orders": {
+          "orders": [
+            {
+              "id": 501,
+              "number": "LK-0501",
+              "buyerId": 101,
+              "storeId": 3,
+              "status": "paid",
+              "currency": "COP",
+              "subtotalAmount": 4000000,
+              "discountAmount": 400000,
+              "totalAmount": 3600000,
+              "commissionRate": 300,
+              "commissionAmount": 108000,
+              "expiresAt": "2026-10-16T14:15:00Z",
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "Solo entrar tras estado paid/preparing/completed. Para afirmar recepción final de fondos en pagos reales falta confirmación del proveedor.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "18",
+      "title": "Mis compras (antes wallet)",
+      "route": "wallet",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/pages/WalletPage.jsx",
+      "preview": [
+        "Explora. Visita. Disfruta.",
+        "Compras realizadas",
+        "Café Alba · 16 oct 2026",
+        "Comprobante · $36.000 COP"
+      ],
+      "fields": [
+        {
+          "field": "orders[].id / storeId / status / createdAt",
+          "type": "id / enum / ISO8601",
+          "origin": "Actual",
+          "rule": "Mostrar paid/preparing/completed/refunded; identificar reembolsos"
+        },
+        {
+          "field": "orders[].totalAmount / currency",
+          "type": "integer / ISO4217",
+          "origin": "Actual",
+          "rule": "Importe de cada compra; nunca saldo"
+        },
+        {
+          "field": "store.name",
+          "type": "string",
+          "origin": "Derivado",
+          "rule": "Resolver tienda por storeId"
+        }
+      ],
+      "endpoints": [
+        "GET /orders?cursor=",
+        "GET /stores/:id"
+      ],
+      "examples": {
+        "orders": {
+          "orders": [
+            {
+              "id": 501,
+              "number": "LK-0501",
+              "buyerId": 101,
+              "storeId": 3,
+              "status": "paid",
+              "currency": "COP",
+              "subtotalAmount": 4000000,
+              "discountAmount": 400000,
+              "totalAmount": 3600000,
+              "commissionRate": 300,
+              "commissionAmount": 108000,
+              "expiresAt": "2026-10-16T14:15:00Z",
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "La vista actual es un listado de comprobantes; no hay detalle dedicado de comprobante. No hay wallet custodial ni consulta de saldo.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "19",
+      "title": "Cuponera",
+      "route": "coupons",
+      "role": "Buyer",
+      "status": "Demo",
+      "source": "src/pages/CouponsPage.jsx",
+      "preview": [
+        "Cupones para ti",
+        "Todos · Cercanos · Gastronomía",
+        "10% de descuento · Café Alba",
+        "Válido hasta 31 dic · Toca para guardar"
+      ],
+      "fields": [
+        {
+          "field": "coupon.id / storeId / title / description / expiresAt",
+          "type": "id / string / ISO8601",
+          "origin": "Pendiente",
+          "rule": "La tarjeta completa guarda/retira el cupón"
+        },
+        {
+          "field": "saved / eligibility / terms / redeemedAt",
+          "type": "boolean / reglas",
+          "origin": "Pendiente",
+          "rule": "Persistencia, uso único y validación en checkout"
+        },
+        {
+          "field": "discount type / value / currency",
+          "type": "enum / integer / ISO4217",
+          "origin": "Pendiente",
+          "rule": "Descuentos de ítem existentes no equivalen a cuponera"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoints de cupones/guardados/canje"
+      ],
+      "examples": {
+        "coupons": {
+          "coupons": [
+            {
+              "id": "c-1",
+              "storeId": 3,
+              "title": "10% de descuento",
+              "description": "En café de origen.",
+              "type": "percent",
+              "value": 1000,
+              "startsAt": "2026-10-01T00:00:00Z",
+              "expiresAt": "2026-12-31T23:59:59Z",
+              "saved": true,
+              "status": "active",
+              "eligibleItemIds": [
+                8
+              ],
+              "minimumPurchaseAmount": 0,
+              "currency": "COP",
+              "terms": "Un uso por comprador.",
+              "redeemedAt": null
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "Bloqueada con «Información no disponible» en modo API. No aplicar descuentos en cliente como autoridad.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "20",
+      "title": "Perfil del comprador",
+      "route": "profile → buyer",
+      "role": "Buyer",
+      "status": "API",
+      "source": "src/pages/ProfilePage.jsx",
+      "preview": [
+        "Hola, Alex",
+        "Alex Demo · alex@example.com",
+        "Mis compras · Descubrir tiendas",
+        "Idioma · Cerrar sesión"
+      ],
+      "fields": [
+        {
+          "field": "user.id / name / email / role",
+          "type": "string / enum",
+          "origin": "Actual",
+          "rule": "role=buyer|seller; cuenta separada por rol"
+        },
+        {
+          "field": "user.emailVerified / phone",
+          "type": "boolean / string|null",
+          "origin": "Actual",
+          "rule": "No exigir verificación para entrar"
+        },
+        {
+          "field": "locale",
+          "type": "BCP47",
+          "origin": "Pendiente",
+          "rule": "Propuesto en user.locale; manual → perfil → navegador → es-CO"
+        }
+      ],
+      "endpoints": [
+        "GET /me",
+        "POST /auth/sign-out",
+        "Propuesta: PATCH /me con locale"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        },
+        "locale": {
+          "user": {
+            "id": "101",
+            "locale": "en-US"
+          }
+        }
+      },
+      "note": "Selector de idioma solo se guarda en navegador. PATCH /me actual acepta name/phone; no locale. No existe pantalla de edición de perfil.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "21",
+      "title": "Impacto del viaje",
+      "route": "impact",
+      "role": "Buyer",
+      "status": "Demo",
+      "source": "src/pages/ImpactPage.jsx",
+      "preview": [
+        "Tu impacto",
+        "5 tiendas apoyadas · 120 USD",
+        "1 país · 12 emprendedores",
+        "Ver detalle de impacto"
+      ],
+      "fields": [
+        {
+          "field": "period / storesSupported / totalSpentAmount / currency",
+          "type": "rango / integer",
+          "origin": "Pendiente",
+          "rule": "Definir zona horaria, estados incluidos y conversión"
+        },
+        {
+          "field": "countriesVisited / entrepreneursBenefited / methodology",
+          "type": "integer / string",
+          "origin": "Pendiente",
+          "rule": "No deducir beneficiarios sin fuente y metodología"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint de impacto"
+      ],
+      "examples": {
+        "impact": {
+          "period": {
+            "from": "2026-10-01",
+            "to": "2026-10-31",
+            "timeZone": "America/Bogota"
+          },
+          "storesSupported": 5,
+          "totalSpentAmount": 48000000,
+          "currency": "COP",
+          "countriesVisited": 1,
+          "entrepreneursBenefited": 12,
+          "methodology": "DEMO: requiere definir cómo se mide cada indicador."
+        }
+      },
+      "note": "Métricas fijas en mock; bloqueada en API. Los indicadores no son métricas reales.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "22",
+      "title": "Detalle del impacto",
+      "route": "impactDetail",
+      "role": "Buyer",
+      "status": "Demo",
+      "source": "src/pages/ImpactDetailPage.jsx",
+      "preview": [
+        "Impacto de tu viaje · Medellín",
+        "Distribución de tu gasto",
+        "Gastronomía 66,67%",
+        "Impacto por tienda"
+      ],
+      "fields": [
+        {
+          "field": "byCategory[] / byStore[] / currency",
+          "type": "array / ISO4217",
+          "origin": "Pendiente",
+          "rule": "Importes agregados y porcentajes coherentes; resolver nombres/logos"
+        },
+        {
+          "field": "period / city",
+          "type": "rango / string",
+          "origin": "Pendiente",
+          "rule": "Mismo alcance que resumen de impacto"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint de impacto"
+      ],
+      "examples": {
+        "impactDetail": {
+          "city": "Medellín",
+          "currency": "COP",
+          "byCategory": [
+            {
+              "category": "Gastronomía",
+              "amount": 32000000,
+              "share": 66.67
+            },
+            {
+              "category": "Artesanías",
+              "amount": 16000000,
+              "share": 33.33
+            }
+          ],
+          "byStore": [
+            {
+              "storeId": 3,
+              "amount": 48000000
+            }
+          ]
+        }
+      },
+      "note": "Gráfica y montos actuales fijos en mock; bloqueada en API.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "23",
+      "title": "Perfil del vendedor",
+      "route": "profile → seller",
+      "role": "Seller",
+      "status": "API",
+      "source": "src/pages/ProfilePage.jsx",
+      "preview": [
+        "Hola, Alba",
+        "Mi negocio · Gestiona tu sucursal",
+        "Estadísticas de ventas",
+        "Idioma · Cerrar sesión"
+      ],
+      "fields": [
+        {
+          "field": "user.id / name / email / role",
+          "type": "string / enum",
+          "origin": "Actual",
+          "rule": "role=buyer|seller; cuenta separada por rol"
+        },
+        {
+          "field": "user.emailVerified / phone",
+          "type": "boolean / string|null",
+          "origin": "Actual",
+          "rule": "No exigir verificación para entrar"
+        },
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        }
+      ],
+      "endpoints": [
+        "GET /me",
+        "GET /seller/store",
+        "POST /auth/sign-out"
+      ],
+      "examples": {
+        "user": {
+          "user": {
+            "id": "101",
+            "name": "Alex Demo",
+            "email": "alex@example.com",
+            "role": "buyer",
+            "emailVerified": true,
+            "phone": null
+          }
+        },
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        }
+      },
+      "note": "Ejemplo user.role debe ser seller. Estadísticas enlazadas pero sin endpoint. No ofrecer comprar con esta cuenta.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "24",
+      "title": "Panel del vendedor actual",
+      "route": "seller → API",
+      "role": "Seller",
+      "status": "API",
+      "source": "src/pages/merchant/ApiSellerPage.jsx",
+      "preview": [
+        "Tu sucursal, productos y pedidos",
+        "Café Alba · Ver tienda",
+        "Productos · Café 250 g",
+        "Pedido LK-0501 · Pagado"
+      ],
+      "fields": [
+        {
+          "field": "store.id / name / description",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Descripción admite vacío; nombre obligatorio"
+        },
+        {
+          "field": "store.city / address",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Mostrar dirección real"
+        },
+        {
+          "field": "store.latitude / longitude",
+          "type": "number|null",
+          "origin": "Actual",
+          "rule": "Sin coordenadas válidas no hay pin"
+        },
+        {
+          "field": "store.currency / status",
+          "type": "ISO4217 / enum",
+          "origin": "Actual",
+          "rule": "Moneda inmutable; catálogo de tiendas activas"
+        },
+        {
+          "field": "store.bannerUrl / iconUrl",
+          "type": "URL relativa|null",
+          "origin": "Actual",
+          "rule": "Portada y logo; resolver /uploads contra host Axiom; fallback visual si falta o falla"
+        },
+        {
+          "field": "item.id / storeId / categoryId / sku",
+          "type": "id / id / id|null / string",
+          "origin": "Actual",
+          "rule": "Asociar producto a sucursal y categoría"
+        },
+        {
+          "field": "item.name / description",
+          "type": "string",
+          "origin": "Actual",
+          "rule": "Contenido original; traducción de catálogo pendiente"
+        },
+        {
+          "field": "priceAmount / discountAmount / finalPriceAmount",
+          "type": "integer",
+          "origin": "Actual",
+          "rule": "Unidades menores; mostrar finalPriceAmount"
+        },
+        {
+          "field": "item.currency / available",
+          "type": "ISO4217 / integer",
+          "origin": "Actual",
+          "rule": "Agotado: no añadir"
+        },
+        {
+          "field": "item.images[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "id,url,width,height,position; portada por orden"
+        },
+        {
+          "field": "order.id / number / storeId / buyerId",
+          "type": "id / string",
+          "origin": "Actual",
+          "rule": "Identificadores del comprobante"
+        },
+        {
+          "field": "order.status / expiresAt / createdAt",
+          "type": "enum / ISO8601",
+          "origin": "Actual",
+          "rule": "pending_payment,paid,preparing,completed,cancelled,refunded"
+        },
+        {
+          "field": "order.currency / *Amount / commissionRate",
+          "type": "ISO4217 / integer",
+          "origin": "Actual",
+          "rule": "Precios congelados y total desde servidor; confirmar escala de commissionRate"
+        },
+        {
+          "field": "order.items[] / history[]",
+          "type": "array",
+          "origin": "Actual",
+          "rule": "Solo en detalle; no en listado"
+        },
+        {
+          "field": "sellerItem.status",
+          "type": "enum",
+          "origin": "Actual",
+          "rule": "draft/active/inactive; detalle añade stock"
+        }
+      ],
+      "endpoints": [
+        "GET /seller/store",
+        "GET /seller/items?cursor=",
+        "GET /seller/orders?cursor="
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        },
+        "items": {
+          "items": [
+            {
+              "id": 8,
+              "storeId": 3,
+              "categoryId": 4,
+              "sku": "DEMO-001",
+              "name": "Café de origen 250 g",
+              "description": "Notas de chocolate y caramelo.",
+              "priceAmount": 2000000,
+              "currency": "COP",
+              "discount": {
+                "id": 3,
+                "type": "percent",
+                "value": 1000,
+                "startsAt": "2026-10-01T00:00:00Z",
+                "endsAt": "2026-12-31T23:59:59Z",
+                "active": true
+              },
+              "discountAmount": 200000,
+              "finalPriceAmount": 1800000,
+              "available": 12,
+              "images": [
+                {
+                  "id": 18,
+                  "url": "/uploads/demo/cafe.webp",
+                  "width": 1024,
+                  "height": 1024,
+                  "position": 0
+                }
+              ],
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        },
+        "orders": {
+          "orders": [
+            {
+              "id": 501,
+              "number": "LK-0501",
+              "buyerId": 101,
+              "storeId": 3,
+              "status": "paid",
+              "currency": "COP",
+              "subtotalAmount": 4000000,
+              "discountAmount": 400000,
+              "totalAmount": 3600000,
+              "commissionRate": 300,
+              "commissionAmount": 108000,
+              "expiresAt": "2026-10-16T14:15:00Z",
+              "createdAt": "2026-10-16T14:00:00Z"
+            }
+          ],
+          "nextCursor": null
+        }
+      },
+      "note": "Panel actual de consulta. Formularios de editar productos, stock, categorías e imágenes no están implementados, aunque la API ofrece operaciones.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "25",
+      "title": "Panel comercial con métricas",
+      "route": "seller → mock",
+      "role": "Seller",
+      "status": "Demo",
+      "source": "src/pages/merchant/SellerPage.jsx",
+      "preview": [
+        "Hoy · Semana · Mes · Año",
+        "Ventas totales $3.450.000 COP",
+        "56 pagos · 28 internacionales",
+        "Estadísticas · Pagos programados"
+      ],
+      "fields": [
+        {
+          "field": "totalAmount / paymentsCount / internationalCustomers / growthPercent",
+          "type": "integer / number",
+          "origin": "Pendiente",
+          "rule": "Definir período, moneda, reembolsos y comparación"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint agregado de estadísticas"
+      ],
+      "examples": {
+        "stats": {
+          "period": "month",
+          "from": "2026-10-01",
+          "to": "2026-10-31",
+          "timeZone": "America/Bogota",
+          "currency": "COP",
+          "totalAmount": 345000000,
+          "paymentsCount": 56,
+          "internationalCustomers": 28,
+          "growthPercent": 22,
+          "averageTicketAmount": 6160714,
+          "series": [
+            {
+              "date": "2026-10-15",
+              "amount": 12000000
+            },
+            {
+              "date": "2026-10-16",
+              "amount": 24800000
+            }
+          ],
+          "customersByCountry": [
+            {
+              "country": "US",
+              "count": 18,
+              "share": 32.14
+            }
+          ]
+        }
+      },
+      "note": "Variante mock del panel, no una ruta adicional. API muestra productos/pedidos, no estas métricas.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "26",
+      "title": "Crear tienda del prototipo",
+      "route": "createStore",
+      "role": "Seller",
+      "status": "Demo",
+      "source": "src/pages/merchant/CreateStorePage.jsx",
+      "preview": [
+        "Crea tu tienda",
+        "Logo · foto de portada",
+        "Nombre · categoría · historia",
+        "Barrio · dirección · Crear mi tienda"
+      ],
+      "fields": [
+        {
+          "field": "name / category / description / address / neighborhood",
+          "type": "string",
+          "origin": "Local",
+          "rule": "Nombre 3–60; historia 15–500; dirección máx.100 en este formulario"
+        },
+        {
+          "field": "logo / cover",
+          "type": "imagen",
+          "origin": "Pendiente",
+          "rule": "No existe carga de medios para tienda en contrato"
+        },
+        {
+          "field": "latitude / longitude",
+          "type": "number",
+          "origin": "Derivado",
+          "rule": "En mock se aproxima al barrio; no usar en producción"
+        }
+      ],
+      "endpoints": [
+        "API: sucursal solo en POST /auth/seller/sign-up"
+      ],
+      "examples": {
+        "store": {
+          "store": {
+            "id": 3,
+            "name": "Café Alba Medellín",
+            "description": "Café de origen y artesanía local.",
+            "city": "Medellín",
+            "address": "Carrera 70 # 44-10",
+            "latitude": 6.2442,
+            "longitude": -75.5812,
+            "currency": "COP",
+            "bannerUrl": "/uploads/stores/3/banner-demo.webp",
+            "iconUrl": "/uploads/stores/3/icon-demo.webp",
+            "status": "active"
+          }
+        },
+        "storeExtras": {
+          "iconUrl": "/uploads/stores/3/icon-demo.webp",
+          "bannerUrl": "/uploads/stores/3/banner-demo.webp"
+        }
+      },
+      "note": "Formulario independiente de mock. No es el registro API de vendedor. Acordar si se conserva o se unifica con onboarding.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "27",
+      "title": "Estadísticas de ventas",
+      "route": "stats",
+      "role": "Seller",
+      "status": "Demo",
+      "source": "src/pages/merchant/SalesStatsPage.jsx",
+      "preview": [
+        "Estadísticas de ventas",
+        "Ventas $3.450.000 · +22%",
+        "Gráfica por período · Ticket promedio",
+        "Clientes por país"
+      ],
+      "fields": [
+        {
+          "field": "period / from / to / timeZone / currency",
+          "type": "enum / fechas",
+          "origin": "Pendiente",
+          "rule": "Hoy, semana, mes, año; fecha y comparación explícitas"
+        },
+        {
+          "field": "series[] / customersByCountry[]",
+          "type": "array",
+          "origin": "Pendiente",
+          "rule": "Buckets con fecha, monto; países con count y share"
+        },
+        {
+          "field": "totalAmount / averageTicketAmount / growthPercent",
+          "type": "integer / number",
+          "origin": "Pendiente",
+          "rule": "Importes menores; política de redondeo"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoint de estadísticas"
+      ],
+      "examples": {
+        "stats": {
+          "period": "month",
+          "from": "2026-10-01",
+          "to": "2026-10-31",
+          "timeZone": "America/Bogota",
+          "currency": "COP",
+          "totalAmount": 345000000,
+          "paymentsCount": 56,
+          "internationalCustomers": 28,
+          "growthPercent": 22,
+          "averageTicketAmount": 6160714,
+          "series": [
+            {
+              "date": "2026-10-15",
+              "amount": 12000000
+            },
+            {
+              "date": "2026-10-16",
+              "amount": 24800000
+            }
+          ],
+          "customersByCountry": [
+            {
+              "country": "US",
+              "count": 18,
+              "share": 32.14
+            }
+          ]
+        }
+      },
+      "note": "Bloqueada en modo API. Definir qué significa cliente internacional y de dónde sale su país.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "28",
+      "title": "Pagos programados",
+      "route": "scheduled",
+      "role": "Seller",
+      "status": "Demo",
+      "source": "src/pages/merchant/ScheduledPaymentsPage.jsx",
+      "preview": [
+        "Activar pagos programados",
+        "Diaria · Semanal · Mensual",
+        "Monto mínimo · 50 USD",
+        "Banco Demo · cuenta 1234"
+      ],
+      "fields": [
+        {
+          "field": "enabled / frequency / minimumAmount / currency",
+          "type": "boolean / enum / integer",
+          "origin": "Pendiente",
+          "rule": "Persistencia por vendedor; no confundir moneda con idioma"
+        },
+        {
+          "field": "destination.id / bankName / last4",
+          "type": "string",
+          "origin": "Pendiente",
+          "rule": "Referencia y datos enmascarados; no cuenta completa"
+        },
+        {
+          "field": "nextPayoutAt",
+          "type": "ISO8601|null",
+          "origin": "Propuesta",
+          "rule": "Útil para confirmación; no se muestra hoy"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoints de abonos bancarios/configuración"
+      ],
+      "examples": {
+        "schedule": {
+          "enabled": true,
+          "frequency": "weekly",
+          "minimumAmount": 5000,
+          "currency": "USD",
+          "destination": {
+            "id": "dest-demo",
+            "bankName": "Banco Demo",
+            "last4": "1234"
+          },
+          "nextPayoutAt": "2026-10-23T14:00:00Z"
+        }
+      },
+      "note": "Solo mock, bloqueada en API. Los abonos bancarios requieren definir proveedor y compatibilidad con Open Payments.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "29",
+      "title": "Configuración de pagos y avisos",
+      "route": "settings",
+      "role": "Seller",
+      "status": "Demo",
+      "source": "src/pages/merchant/PaymentSettingsPage.jsx",
+      "preview": [
+        "Pagos y notificaciones",
+        "Frecuencia · monto · destino",
+        "Pago realizado ✓ · Errores ✓",
+        "Desactivar pagos programados"
+      ],
+      "fields": [
+        {
+          "field": "schedule.*",
+          "type": "objeto",
+          "origin": "Pendiente",
+          "rule": "Misma configuración que scheduled"
+        },
+        {
+          "field": "notifications.paymentCompleted / minimumThreshold / paymentError",
+          "type": "boolean",
+          "origin": "Pendiente",
+          "rule": "Canal de envío y persistencia por acordar"
+        }
+      ],
+      "endpoints": [
+        "Sin endpoints de preferencias de pago/avisos"
+      ],
+      "examples": {
+        "schedule": {
+          "enabled": true,
+          "frequency": "weekly",
+          "minimumAmount": 5000,
+          "currency": "USD",
+          "destination": {
+            "id": "dest-demo",
+            "bankName": "Banco Demo",
+            "last4": "1234"
+          },
+          "nextPayoutAt": "2026-10-23T14:00:00Z"
+        },
+        "notifications": {
+          "paymentCompleted": true,
+          "minimumThreshold": true,
+          "paymentError": true
+        }
+      },
+      "note": "Controles modifican estado de sesión; no se guarda en backend. Bloqueada en API.",
+      "states": "Cargando · vacío · error · listo"
+    },
+    {
+      "id": "30",
+      "title": "Estados transversales y acceso",
+      "route": "Todas las rutas privadas",
+      "role": "Según rol",
+      "status": "Local",
+      "source": "src/app/AppRouter.jsx",
+      "preview": [
+        "Recuperando tu sesión…",
+        "Acceso según tu cuenta",
+        "Información no disponible",
+        "No pudimos cargar tu sucursal"
+      ],
+      "fields": [
+        {
+          "field": "session / role / storesStatus",
+          "type": "estado",
+          "origin": "Actual",
+          "rule": "401 limpia sesión; rol validado en servidor"
+        },
+        {
+          "field": "error.code / error.message / HTTP status",
+          "type": "string / integer",
+          "origin": "Actual",
+          "rule": "Aceptar envoltorio error o formato genérico de auth"
+        },
+        {
+          "field": "nextCursor / Retry-After",
+          "type": "string|null / header",
+          "origin": "Actual",
+          "rule": "No asumir que una página contiene todo"
+        }
+      ],
+      "endpoints": [
+        "GET /me",
+        "Respuestas de todos los endpoints"
+      ],
+      "examples": {
+        "error": {
+          "error": {
+            "code": "INSUFFICIENT_STOCK",
+            "message": "No hay unidades suficientes."
+          }
+        }
+      },
+      "note": "También contemplar imagen fallida, sin resultados, reconexión y 429. No mostrar pantallas privadas durante restauración.",
+      "states": "401 · 403 · 404 · 409 · 429 · 5xx · sin red"
+    }
+  ]
+}
