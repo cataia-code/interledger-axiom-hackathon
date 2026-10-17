@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom API · Probador</title>
+<style>
+  :root {
+    --bg: #f5f6fa; --card: #fff; --text: #1b1e2b; --muted: #6b7185; --line: #e3e6ef;
+    --accent: #5b5bf0; --accent-ink: #fff; --code-bg: #0f1220; --code-text: #d7def5;
+    --get: #1f9d68; --post: #e08a00; --put: #3a7bdc; --patch: #8a56d6; --delete: #d6454f;
+    --ok: #1f9d68; --warn: #e08a00; --err: #d6454f;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0d0f1a; --card: #161a2b; --text: #e8ebf7; --muted: #8a91ab; --line: #262b42;
+      --accent: #7c7cff; --accent-ink: #0d0f1a; --code-bg: #0a0c16;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+  header { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+  .logo { width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+    background: linear-gradient(135deg, var(--accent), #b06cff); color: #fff; font-weight: 700; }
+  h1 { font-size: 20px; margin: 0; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 2px rgba(0,0,0,.04); }
+  label { display: block; font-size: 12px; font-weight: 600; color: var(--muted);
+    text-transform: uppercase; letter-spacing: .04em; margin-bottom: 6px; }
+  .field { margin-bottom: 16px; }
+  .field:last-child { margin-bottom: 0; }
+  input, select, textarea { width: 100%; font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; outline: none; }
+  input:focus, select:focus, textarea:focus { border-color: var(--accent);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+  textarea { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 13px; resize: vertical; }
+  .row { display: grid; grid-template-columns: 120px 1fr; gap: 10px; }
+  .badge { display: inline-block; min-width: 54px; text-align: center; padding: 1px 8px; border-radius: 6px;
+    font: 700 11px ui-monospace, monospace; color: #fff; }
+  .m-GET { background: var(--get); } .m-POST { background: var(--post); } .m-PUT { background: var(--put); }
+  .m-PATCH { background: var(--patch); } .m-DELETE { background: var(--delete); }
+  .hint { font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .actions { display: flex; align-items: center; gap: 12px; }
+  button { font: inherit; font-weight: 600; border: 0; border-radius: 10px; padding: 10px 20px; cursor: pointer;
+    background: var(--accent); color: var(--accent-ink); display: inline-flex; align-items: center; gap: 8px; }
+  button:disabled { opacity: .6; cursor: progress; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line);
+    padding: 4px 10px; font-size: 12px; }
+  .spinner { width: 16px; height: 16px; border-radius: 50%; border: 2px solid currentColor;
+    border-right-color: transparent; animation: spin .7s linear infinite; display: none; }
+  .loading .spinner { display: inline-block; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .result-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; min-height: 28px; }
+  .pill { padding: 2px 10px; border-radius: 999px; font: 700 12px ui-monospace, monospace; color: #fff; }
+  .s-ok { background: var(--ok); } .s-warn { background: var(--warn); } .s-err { background: var(--err); }
+  .meta { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1; }
+  pre { margin: 0; background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px;
+    overflow: auto; max-height: 460px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
+  pre.empty { color: var(--muted); font-style: italic; }
+  .k { color: #8ab4ff; } .s { color: #9be29b; } .n { color: #ffb86b; } .b { color: #ff8fa3; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="logo">A</div>
+    <div>
+      <h1>Axiom API · Probador</h1>
+      <p id="origin"></p>
+    </div>
+  </header>
+
+  <form id="form" class="card">
+    <div class="field">
+      <label for="preset">Endpoint</label>
+      <select id="preset"></select>
+    </div>
+    <div class="field">
+      <label for="path">Ruta (editable)</label>
+      <div class="row">
+        <select id="method">
+          <option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option>
+        </select>
+        <input id="path" value="/api/v1/health" spellcheck="false" autocomplete="off">
+      </div>
+      <div class="hint">Elige uno de la lista o escribe cualquier ruta. Reemplaza <code>:id</code> por el valor real.</div>
+    </div>
+    <div class="field">
+      <label for="token">Bearer token (opcional)</label>
+      <input id="token" type="password" placeholder="Pega aquí tu token" autocomplete="off">
+    </div>
+    <div class="field" id="bodyField">
+      <label for="body">Body JSON (opcional)</label>
+      <textarea id="body" rows="5" spellcheck="false" placeholder='{ "clave": "valor" }'></textarea>
+    </div>
+    <div class="actions">
+      <button id="send" type="submit"><span class="spinner"></span><span id="sendLabel">Enviar petición</span></button>
+    </div>
+  </form>
+
+  <section class="card">
+    <div class="result-head">
+      <span id="status"></span>
+      <span id="meta" class="meta"></span>
+      <span class="spacer"></span>
+      <button id="copy" type="button" class="ghost">Copiar</button>
+    </div>
+    <pre id="out" class="empty">Aquí aparecerá la respuesta.</pre>
+  </section>
+</div>
+<script src="/demo.js"></script>
+</body>
+</html>
