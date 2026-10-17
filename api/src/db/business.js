@@ -41,6 +41,8 @@ export const store = pgTable('store', {
   longitude: numeric('longitude', { precision: 9, scale: 6, mode: 'number' }).notNull(),
   legalId: text('legal_id').notNull(),
   currency: char('currency', { length: 3 }).notNull(),
+  bannerPath: text('banner_path'), // relativo al almacén de imágenes; null = sin banner
+  iconPath: text('icon_path'), // icono circular (pin del mapa)
   status: text('status').default('active').notNull(), // active | paused | closed
   deletedAt: timestamp('deleted_at'),
   createdAt: timestamp('created_at').defaultNow().notNull(),

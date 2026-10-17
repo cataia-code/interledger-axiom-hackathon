@@ -55,6 +55,10 @@ router.patch('/seller/organization', seller.patchOrganization);
 router.get('/seller/store', seller.getOwnStore);
 router.patch('/seller/store', seller.patchOwnStore);
 router.delete('/seller/store', seller.deleteOwnStore);
+router.put('/seller/store/banner', limiter(20), uploadImage, seller.putStoreImage('banner'));
+router.delete('/seller/store/banner', seller.deleteStoreImage('banner'));
+router.put('/seller/store/icon', limiter(20), uploadImage, seller.putStoreImage('icon'));
+router.delete('/seller/store/icon', seller.deleteStoreImage('icon'));
 
 router.get('/seller/categories', catalog.listOwnCategories);
 router.post('/seller/categories', catalog.postCategory);

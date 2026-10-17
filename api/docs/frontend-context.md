@@ -107,7 +107,10 @@ Item = {
   images: [{ id, url, width, height, position }],   // url relativa al host
   createdAt
 }
-PublicStore = { id, name, description, city, address, latitude, longitude, currency, status }
+PublicStore = { id, name, description, city, address, latitude, longitude, currency, status,
+  bannerUrl,   // imagen de portada 1600×600 (WebP) o null
+  iconUrl }    // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+// Las URLs son relativas al host: <host>/uploads/…
 Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 ```
 
@@ -166,6 +169,9 @@ Todo se limita a la sucursal del vendedor (1 sucursal por organización). Lo aje
 | Método | Ruta | Notas |
 |---|---|---|
 | GET/PATCH | `/seller/organization` | PATCH: `legalName, tradeName, legalAddress, phone`. `taxId, legalId, country` son inmutables |
+| PUT | `/seller/store/banner` | `multipart/form-data`, campo **`image`** (JPEG/PNG/WebP ≤5 MB). Se recorta a 1600×600. Reemplaza el anterior. → `{store}` |
+| PUT | `/seller/store/icon` | Igual; se recorta a un círculo de 256×256 con fondo transparente |
+| DELETE | `/seller/store/banner` · `/seller/store/icon` | Quita la imagen. → `{store}` |
 | GET/PATCH | `/seller/store` | PATCH: nombre, descripción, dirección, ciudad, teléfono, lat/lon, `status` (`active`\|`paused`) |
 | DELETE | `/seller/store` | Cierra la sucursal (borrado lógico); el vendedor ya no podrá iniciar sesión (`STORE_REQUIRED`) |
 
