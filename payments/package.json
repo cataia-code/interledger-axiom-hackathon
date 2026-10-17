@@ -3,7 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "pay": "tsx src/pay.ts"
+    "op": "tsx src/cli.ts",
+    "pay": "tsx src/cli.ts pay"
   },
   "dependencies": {
     "@interledger/open-payments": "^7.4.0",

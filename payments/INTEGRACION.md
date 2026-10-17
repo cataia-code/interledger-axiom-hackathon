@@ -16,19 +16,19 @@ El QR (o la ficha del comercio) ya trae tres datos:
 - el monto, `20000`
 - la moneda, `COP`
 
-La wallet del comprador no se busca en Interledger en ese momento. Se guardó antes, cuando la persona vinculó su cuenta en la app. El front, con el usuario ya logueado, llama al checkout y manda esa URL guardada junto con los datos del QR. La persona no abre Interledger, no copia un id y no vuelve a la app para pegarlo.
+La wallet del buyer no se busca en Interledger en ese momento. Quedó guardada cuando vinculó la cuenta. Con la sesión abierta, el front llama `POST /api/v1/orders/:id/pay`. La persona no abre Interledger, no copia un id y no vuelve a la app para pegarlo.
 
-El backend responde con la cotización y con `interact.redirect`. El front abre esa URL. Ahí la entidad de la cuenta pregunta si autoriza el débito. Ese es el único paso que la persona hace al pagar, además de escanear.
+El backend hace en ese mismo request el incoming payment, la cotización y el grant. Responde con `payment`, `debitAmount` y `redirectUrl`. El front muestra una sola pantalla: Monto (`payment.amount`) y Desde tu wallet (`debitAmount`), y un botón. Ese botón abre `redirectUrl`. Ahí la entidad de la cuenta pide la aprobación, que es el único paso fuera de la app.
+
+`payments/` no es un microservicio. Es el flujo de referencia. El cobro vive en un módulo del backend que ya existe: el front nunca firma, nunca ve `private.key` y nunca habla con Interledger. El módulo es el único que tiene la llave, arma el grant y marca el pedido pagado.
 
 Pagar con Bancolombia quiere decir que la wallet guardada del comprador es una cuenta de ese banco. El banco, al vincular la cuenta, entrega la URL una sola vez y la app la guarda. En la red de pruebas esa entidad es la wallet de Interledger: crear la cuenta en [wallet.interledger-test.dev](https://wallet.interledger-test.dev) y guardar la URL en el perfil reemplaza ese vínculo, y también se hace una sola vez por usuario.
 
-El checkout recibe:
+El cobro ya tiene endpoint: `POST /api/v1/orders/:id/pay`, con el buyer autenticado. El body no vuelve a mandar el monto. Sale del `order`: `totalAmount` y `currency` en unidades menores, más `buyerId` y `storeId`. La wallet del buyer y la del dueño del `store` se leen en el servidor. En el front la tienda se llama `shop`; al hablar con la API el nombre es `store`.
 
-- `sellerWallet`: URL que vino en el QR
-- `amount` y la moneda del QR (`20000`, `COP`)
-- `buyerWallet`: la URL ya guardada del usuario logueado. La manda el front o la lee el backend del perfil. En los dos casos la persona no la escribe.
+La respuesta sigue el JSON del back, en camelCase: el `payment` con `id`, `orderId`, `provider`, `providerRef`, `status`, `amount`, `currency`, y al lado `debitAmount` (lo que sale de la wallet) y `redirectUrl`. `amount` es lo que recibe la tienda. La diferencia es el fee de la red. `commissionAmount` del `order` es otra cosa: la comisión de Lokora, no este fee.
 
-El script de prueba hace lo mismo por consola:
+El script de prueba arma ese mismo cobro por consola:
 
 ```bash
 npm run pay -- --buyer <url guardada del comprador> --seller <url del QR> --amount 20000
@@ -46,13 +46,13 @@ Si al comprador o al vendedor le falta la URL, el pedido no se puede pagar.
 
 La API guarda enteros. `assetScale` son los decimales y sale del `GET` de la wallet del vendedor. `10.00 EUR` con escala 2 se envía como `"1000"`. `20000` COP con escala 0 se envía como `"20000"`; con escala 2, como `"2000000"`.
 
-`--amount` es lo que debe recibir la tienda, en la moneda de su wallet. Lo que se le debita al comprador lo dice la cotización. No hardcodees la comisión. En las pruebas EUR a EUR de esta red, recibir 1.00 costó 2.00 y recibir 10.00 costó 11.00: sobró 1.00 EUR fijo. Muéstralo y deja que el comprador lo acepte. Si las monedas difieren, muestra lo que sale y lo que llega.
+`--amount` es lo que debe recibir la tienda, en la moneda de su wallet. Lo que se le debita al comprador lo dice la cotización y viaja en el límite del grant, así la pantalla de aprobación ya muestra el débito real. No hardcodees la comisión. En las pruebas EUR a EUR de esta red, recibir 1.00 costó 2.00 y recibir 10.00 costó 11.00: sobró 1.00 EUR fijo.
 
 La cotización de esta red dura unos cinco minutos. El consentimiento tiene que terminar antes. Si vence, se cotiza de nuevo. No se reutiliza.
 
 ## 1. Empezar el checkout
 
-Recibe el id del pedido, la wallet del vendedor, el monto y la moneda. La wallet del comprador es la que ya está guardada en su perfil.
+Un solo endpoint, `POST /api/v1/orders/:id/pay`. El id del pedido va en la ruta. `totalAmount` y `currency` salen del `order`. Las dos wallets se leen en el servidor. Los pasos de abajo son trabajo del backend dentro de esa petición, antes de responder.
 
 1. `GET` de las dos wallet addresses.
 2. Grant `incoming-payment` con acciones `create` y `read`, en el `authServer` de la tienda. No pide consentimiento.
@@ -60,10 +60,8 @@ Recibe el id del pedido, la wallet del vendedor, el monto y la moneda. La wallet
 4. Grant `quote` con acciones `create` y `read`, en el `authServer` del comprador.
 5. Crea el quote con `receiver` igual al id del incoming payment y `method: "ilp"`.
 6. Grant `outgoing-payment` con acciones `create` y `read`, en el `authServer` del comprador. `identifier` es la wallet del comprador. `limits.debitAmount` es el `debitAmount` del quote, no un monto mayor. `interact.start` es `redirect`. `interact.finish` es `redirect`, con la URL de vuelta de este pedido y un `nonce` nuevo.
-7. Guarda esto antes de responder. Hace falta cuando el navegador vuelva: `nonce`, `interact.finish`, `continue.uri`, `continue.access_token`, `quote.id`, `quote.expiresAt`, id del incoming payment, `authServer` del comprador, los dos montos y el id del pedido.
-8. Responde al front con lo que llega, lo que sale, la comisión, el vencimiento y `interact.redirect`.
-
-El front redirige al comprador a esa URL. Trae `clientUri`. No la cortes en el `&`.
+7. Guarda esto antes de responder. Hace falta cuando el navegador vuelva: `nonce`, `interact.finish`, `continue.uri`, `continue.access_token`, `quote.id`, `quote.expiresAt`, id del incoming payment, el access token de ese incoming payment, `authServer` del comprador, los dos montos y el id del pedido. Si el comprador no aprueba, `incomingPayment.complete` con ese token cierra el cobro para que deje de aceptar dinero.
+8. Responde al front con `payment`, `debitAmount` y `redirectUrl` (`interact.redirect`). La pantalla que ya existe muestra Monto (`amount`), Desde tu wallet (`debitAmount`) y un botón. Ese botón abre `redirectUrl`. Trae `clientUri`. No la cortes en el `&`.
 
 ## 2. Volver de la aprobación
 
