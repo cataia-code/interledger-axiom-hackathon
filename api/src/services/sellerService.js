@@ -1,8 +1,9 @@
-import { and, eq, isNull } from 'drizzle-orm';
+import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { user } from '../db/schema.js';
 import { organization, store } from '../db/business.js';
 import { HttpError } from '../middlewares/errorHandler.js';
+import { bad, integer } from './validation.js';
 import { validateOrganizationPatch, validateStorePatch } from './storeService.js';
 
 // Drizzle envuelve el error de pg en `cause`.
@@ -90,6 +91,31 @@ export async function getPublicStore(id) {
     .where(and(eq(store.id, n), isNull(store.deletedAt)));
   if (!row) throw new HttpError(404, 'Store not found', 'STORE_NOT_FOUND');
   return row;
+}
+
+// Listado público de sucursales activas, de la más nueva a la más antigua (cursor = id).
+export async function listPublicStores(query) {
+  const limit = query.limit === undefined ? 20 : integer(query.limit, 'limit', 1, 50, 'INVALID_LIMIT');
+  const where = [eq(store.status, 'active'), isNull(store.deletedAt)];
+  if (query.cursor !== undefined) {
+    const cursor = Number(query.cursor);
+    if (!Number.isSafeInteger(cursor)) throw bad('cursor is not valid', 'INVALID_CURSOR');
+    where.push(lt(store.id, cursor));
+  }
+  const escape = (v) => `%${v.replace(/[\\%_]/g, '\\$&')}%`;
+  if (query.city !== undefined) {
+    const city = String(query.city).trim();
+    if (city.length > 80) throw bad('city must be at most 80 characters', 'INVALID_QUERY');
+    if (city) where.push(ilike(store.city, escape(city)));
+  }
+  if (query.q !== undefined) {
+    const q = String(query.q).trim();
+    if (q.length > 80) throw bad('q must be at most 80 characters', 'INVALID_QUERY');
+    if (q) where.push(or(ilike(store.name, escape(q)), ilike(store.description, escape(q))));
+  }
+  const rows = await db.select().from(store).where(and(...where)).orderBy(desc(store.id)).limit(limit + 1);
+  const page = rows.slice(0, limit);
+  return { stores: page.map(presentPublicStore), nextCursor: rows.length > limit ? String(page.at(-1).id) : null };
 }
 
 export const presentOrganization = (o) => ({

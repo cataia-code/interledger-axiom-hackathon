@@ -1,0 +1,19 @@
+.screen-page { animation: page-arrive .32s var(--ease); }
+.shop-list > .shop-card, .coupon-list > .coupon-card, .product-grid > .product-card { animation: card-arrive .42s var(--ease) both; }
+.shop-list > :nth-child(2), .coupon-list > :nth-child(2), .product-grid > :nth-child(2) { animation-delay: .04s; }
+.shop-list > :nth-child(3), .coupon-list > :nth-child(3), .product-grid > :nth-child(3) { animation-delay: .08s; }
+.shop-list > :nth-child(4), .coupon-list > :nth-child(4), .product-grid > :nth-child(4) { animation-delay: .12s; }
+.shop-list > :nth-child(n+5) { animation-delay: .16s; }
+.store-logo--hero { animation: logo-arrive .5s var(--ease) both; }
+.success-check { animation: icon-arrive .5s var(--ease) both; }
+@keyframes page-arrive { from { opacity: .4; transform: translateY(7px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes card-arrive { from { opacity: 0; transform: translateY(9px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes sheet-arrive { from { opacity: .4; transform: translateY(13px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
+@keyframes icon-arrive { 0% { transform: scale(.75); } 70% { transform: scale(1.08); } 100% { transform: scale(1); } }
+@keyframes logo-arrive { from { opacity: 0; transform: scale(.9) rotate(-2deg); } to { opacity: 1; transform: scale(1) rotate(0); } }
+@keyframes grow-bar { from { transform: scaleY(.05); } to { transform: scaleY(1); } }
+@keyframes scan-laser { from { top: 10%; opacity: .4; } to { top: 90%; opacity: .9; } }
+@keyframes loading-globe { 50% { transform: rotate(12deg) scale(1.08); } }
+@media (prefers-reduced-motion: reduce) {
+  *, *:before, *:after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}
