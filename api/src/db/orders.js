@@ -3,6 +3,7 @@ import { sql } from 'drizzle-orm';
 import { user } from './schema.js';
 import { store } from './business.js';
 import { item } from './catalog.js';
+import { coupon } from './coupons.js';
 
 const id = () => bigint('id', { mode: 'number' }).generatedByDefaultAsIdentity().primaryKey();
 
@@ -15,6 +16,7 @@ export const cart = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: 'cascade' }),
     status: text('status').default('active').notNull(), // active | converted
+    couponId: bigint('coupon_id', { mode: 'number' }).references(() => coupon.id, { onDelete: 'set null' }), // cupón aplicado al carrito
     createdAt: timestamp('created_at').defaultNow().notNull(),
     updatedAt: timestamp('updated_at')
       .defaultNow()
@@ -53,7 +55,10 @@ export const order = pgTable(
       .references(() => store.id, { onDelete: 'cascade' }),
     status: text('status').default('pending_payment').notNull(), // pending_payment | paid | preparing | completed | cancelled | refunded
     subtotalAmount: bigint('subtotal_amount', { mode: 'number' }).notNull(), // precio original de las líneas
-    discountAmount: bigint('discount_amount', { mode: 'number' }).notNull(),
+    discountAmount: bigint('discount_amount', { mode: 'number' }).notNull(), // descuentos de ítem
+    couponId: bigint('coupon_id', { mode: 'number' }).references(() => coupon.id, { onDelete: 'set null' }),
+    couponCode: text('coupon_code'), // código o título del cupón al comprar (el cupón puede editarse después)
+    couponDiscountAmount: bigint('coupon_discount_amount', { mode: 'number' }).default(0).notNull(),
     totalAmount: bigint('total_amount', { mode: 'number' }).notNull(),
     commissionRate: numeric('commission_rate', { precision: 6, scale: 5, mode: 'number' }).notNull(),
     commissionAmount: bigint('commission_amount', { mode: 'number' }).notNull(),
@@ -70,7 +75,7 @@ export const order = pgTable(
     unique('order_buyer_idempotency_unique').on(t.buyerId, t.idempotencyKey),
     index('order_store_status_idx').on(t.storeId, t.status),
     index('order_buyer_idx').on(t.buyerId, t.id),
-    check('order_total_matches', sql`${t.totalAmount} = ${t.subtotalAmount} - ${t.discountAmount}`),
+    check('order_total_matches', sql`${t.totalAmount} = ${t.subtotalAmount} - ${t.discountAmount} - ${t.couponDiscountAmount}`),
   ],
 );
 

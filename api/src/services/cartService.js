@@ -3,14 +3,16 @@ import { db } from '../db/index.js';
 import { store } from '../db/business.js';
 import { item } from '../db/catalog.js';
 import { cart, cartItem } from '../db/orders.js';
+import { coupon } from '../db/coupons.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { integer, parseId } from './validation.js';
 import { currentDiscounts, priceLine, totalsOf } from './pricingService.js';
 import { reservedByItem } from './stockService.js';
+import { evaluateCoupon, loadCouponFacts } from './couponEngine.js';
 
 export const MAX_LINE_QUANTITY = 999;
 
-async function activeCart(userId) {
+export async function activeCart(userId) {
   await db.execute(sql`insert into cart (user_id) values (${userId}) on conflict (user_id) where status = 'active' do nothing`);
   const [row] = await db.select().from(cart).where(and(eq(cart.userId, userId), eq(cart.status, 'active')));
   return row;
@@ -29,10 +31,9 @@ export async function cartRows(cartId, executor = db) {
     .orderBy(cartItem.addedAt, cartItem.itemId);
 }
 
-// Carrito con precios y disponibilidad al momento de consultarlo.
-export async function viewCart(userId) {
-  const c = await activeCart(userId);
-  const rows = await cartRows(c.id);
+// Líneas con precio de un carrito (ya con descuentos de ítem) y sus totales; solo cuentan las que se pueden comprar.
+export async function priceCart(cartId) {
+  const rows = await cartRows(cartId);
   const ids = rows.map((r) => r.item.id);
   const [discounts, reserved] = await Promise.all([currentDiscounts(ids), reservedByItem(ids)]);
   const lines = rows.map((r) => {
@@ -41,10 +42,39 @@ export async function viewCart(userId) {
   });
   const buyable = lines.filter((l) => purchasable(l.r));
   const totals = totalsOf(buyable.map((l) => l.price));
+  return { rows, lines, buyable, totals, storeId: rows[0]?.store.id ?? null };
+}
+
+// Cupón del carrito con el descuento que daría hoy; si ya no es válido, devuelve el motivo y descuento 0.
+async function cartCoupon(c, priced, userId) {
+  if (!c.couponId) return { coupon: null, discount: 0, error: null };
+  const [row] = await db.select().from(coupon).where(eq(coupon.id, c.couponId));
+  if (!row || row.deletedAt) return { coupon: null, discount: 0, error: 'COUPON_NOT_FOUND' };
+  const summary = { id: row.id, code: row.code, title: row.title, type: row.type, value: row.value };
+  try {
+    const facts = await loadCouponFacts(db, row.id, userId);
+    const { discount } = evaluateCoupon(facts, {
+      storeId: priced.storeId,
+      lines: priced.buyable.map((l) => ({ itemId: l.r.item.id, lineAmount: l.price.line })),
+      itemTotal: priced.totals.total,
+    });
+    return { coupon: summary, discount, error: null };
+  } catch (err) {
+    if (!(err instanceof HttpError)) throw err;
+    return { coupon: summary, discount: 0, error: err.code };
+  }
+}
+
+// Carrito con precios y disponibilidad al momento de consultarlo.
+export async function viewCart(userId) {
+  const c = await activeCart(userId);
+  const priced = await priceCart(c.id);
+  const { lines, totals } = priced;
+  const applied = await cartCoupon(c, priced, userId);
   return {
     id: c.id,
-    storeId: rows[0]?.store.id ?? null,
-    currency: rows[0]?.store.currency ?? null,
+    storeId: priced.storeId,
+    currency: priced.rows[0]?.store.currency ?? null,
     lines: lines.map(({ r, price, available }) => ({
       itemId: r.item.id,
       name: r.item.name,
@@ -58,8 +88,11 @@ export async function viewCart(userId) {
       purchasable: purchasable({ item: r.item, store: r.store }) && available >= r.quantity,
     })),
     subtotalAmount: totals.subtotal,
-    discountAmount: totals.discount,
-    totalAmount: totals.total,
+    discountAmount: totals.discount, // solo descuentos de ítem
+    coupon: applied.coupon,
+    couponDiscountAmount: applied.discount,
+    couponError: applied.error,
+    totalAmount: totals.total - applied.discount,
   };
 }
 
@@ -99,4 +132,5 @@ export async function removeCartItem(userId, itemParam) {
 export async function clearCart(userId) {
   const c = await activeCart(userId);
   await db.delete(cartItem).where(eq(cartItem.cartId, c.id));
+  await db.update(cart).set({ couponId: null }).where(eq(cart.id, c.id));
 }

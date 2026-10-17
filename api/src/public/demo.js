@@ -33,6 +33,14 @@ const GROUPS = {
     ['GET', '/api/v1/stores/:id'],
     ['GET', '/api/v1/stores/:id/categories'],
   ],
+  'Cupones (comprador)': [
+    ['GET', '/api/v1/coupons'],
+    ['GET', '/api/v1/coupons?status=available'],
+    ['POST', '/api/v1/coupons/:id/claim', {}],
+    ['PUT', '/api/v1/cart/coupon', { couponId: 1 }],
+    ['PUT', '/api/v1/cart/coupon', { code: 'PANADERIA10' }],
+    ['DELETE', '/api/v1/cart/coupon'],
+  ],
   Cuenta: [
     ['GET', '/api/v1/me'],
     ['PATCH', '/api/v1/me', { name: '', phone: '', country: 'CO' }],
@@ -52,6 +60,13 @@ const GROUPS = {
   'Vendedor (token)': [
     ['GET', '/api/v1/seller/organization'],
     ['GET', '/api/v1/seller/stats'],
+    ['GET', '/api/v1/seller/coupons'],
+    ['POST', '/api/v1/seller/coupons', { title: 'Mi cupón', type: 'percent', value: 1000, audience: 'public', code: 'MICUPON', minSubtotalAmount: 2000000, maxDiscountAmount: 500000 }],
+    ['GET', '/api/v1/seller/coupons/:id'],
+    ['PATCH', '/api/v1/seller/coupons/:id', { status: 'paused' }],
+    ['DELETE', '/api/v1/seller/coupons/:id'],
+    ['POST', '/api/v1/seller/coupons/:id/assign', { emails: ['comprador@example.com'] }],
+    ['GET', '/api/v1/seller/coupons/:id/redemptions'],
     ['GET', '/api/v1/seller/store'],
     ['PUT', '/api/v1/seller/store/banner', null, 'file'],
     ['PUT', '/api/v1/seller/store/icon', null, 'file'],
