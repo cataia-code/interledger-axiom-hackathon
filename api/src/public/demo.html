@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Axiom API demo</title>
+<style>
+  body { font: 14px system-ui; max-width: 760px; margin: 2rem auto; padding: 0 1rem; }
+  input, select, button, textarea { font: inherit; padding: .4rem; }
+  pre { background: #111; color: #0f0; padding: 1rem; overflow: auto; min-height: 6rem; }
+</style>
+</head>
+<body>
+<h1>Axiom API</h1>
+<p>
+  <select id="method"><option>GET</option><option>POST</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select>
+  <input id="path" value="/api/v1/health" list="paths" size="36">
+  <datalist id="paths"><option value="/api/v1/health"><option value="/api/v1/ping"><option value="/api/v1/items"><option value="/api/v1/me"></datalist>
+  <button id="send">Enviar</button>
+</p>
+<p><input id="token" placeholder="Bearer token (opcional)" style="width:100%"></p>
+<p><textarea id="body" rows="4" style="width:100%" placeholder="Body JSON (opcional)"></textarea></p>
+<pre id="out"></pre>
+<script src="/demo.js"></script>
+</body>
+</html>

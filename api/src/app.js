@@ -1,3 +1,4 @@
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -8,6 +9,8 @@ import { config } from './config/index.js';
 import routes from './routes/index.js';
 import { HttpError, notFound, errorHandler } from './middlewares/errorHandler.js';
 import { createRoleAuthRouter } from './routes/roleAuth.js';
+
+const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
 // Registro e inicio de sesión pasan por las rutas por rol (/auth/buyer/*, /auth/seller/*).
 const closedAuthPaths = new Set(['/api/v1/auth/sign-up/email', '/api/v1/auth/sign-in/email', '/api/v1/auth/sign-in/email-otp']);
@@ -30,6 +33,9 @@ export function createApp() {
   app.all('/api/v1/auth/*splat', toNodeHandler(auth));
 
   app.use(express.json());
+
+  // Probador web de la API (mismo origen, no requiere CORS): /demo.html
+  app.use(express.static(publicDir));
 
   // Imágenes subidas (disco local del servidor).
   app.use('/uploads', (req, res, next) => {
