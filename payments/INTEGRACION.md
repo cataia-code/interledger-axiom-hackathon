@@ -1,6 +1,6 @@
 # Cómo integrar el pago
 
-`payments/src/pay.ts` es el flujo ya probado contra la red de pruebas de Interledger. Hay que llevarlo al checkout, sin copiar la terminal. Sigue siendo dinero de juego.
+`payments/src/pay.ts` es el flujo ya probado contra las wallets de test de Interledger. Hay que llevarlo al checkout, sin copiar la terminal.
 
 Este documento cubre solo el cobro. Con la URL de la wallet del comprador y la URL de la wallet del vendedor se puede pagar. La devolución queda fuera.
 

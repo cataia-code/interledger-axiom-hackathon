@@ -1,12 +1,13 @@
 # AI Usage Disclosure
 
-Divulgación pedida por la [AI Policy](https://interledger.org/hackathon/ai-policy/) de la Open Payment Hackathon. Cubre el trabajo de `payments/` hecho en Cursor y los cambios de `api/` hechos con Claude Code que se listan abajo. `Front/` lo lleva el resto del equipo; si usaron otra herramienta, hay que sumarla en este archivo.
+Divulgación pedida por la [AI Policy](https://interledger.org/hackathon/ai-policy/) de la Open Payment Hackathon. Cubre `payments/` en Cursor, `api/` con Claude Code y el prototipo de `Front/` con Codex.
 
 ## Tools Used
 
 - Cursor, con el modelo Grok, en la carpeta `payments/` y en este documento.
 - Claude Code (CLI de Anthropic), con el modelo Claude Sonnet 5.5, en la carpeta `api/`: código, pruebas, documentación y scripts.
 - Claude in Chrome (extensión de Anthropic que maneja el navegador de la persona), para abrir pull requests en GitHub y configurar Railway desde su panel.
+- Codex, en su última versión, en la carpeta `Front/`: el prototipo y su documentación.
 
 No tenemos a mano el consumo de créditos de esas sesiones. Si el plan es de pago, el equipo completa aquí el número que muestre cada herramienta.
 
@@ -43,7 +44,14 @@ No tenemos a mano el consumo de créditos de esas sesiones. Si el plan es de pag
 - Se corrió el seed contra la API desplegada y se borraron, por los endpoints de la propia API, las tiendas e ítems del seed anterior.
 - Los pull requests #13, #14 y #16 se abrieron desde el navegador con Claude in Chrome. Los anteriores de la rama `feature/api-demo-page` (probador, `GET /stores` y seed) los abrió una persona del equipo con un enlace preparado por Claude Code. Ningún pull request lo mergeó la IA: los mergeó y desplegó una persona del equipo.
 
-### 3. Documentación de la hackathon
+### 3. Prototipo (`Front/`), con Codex
+
+- Codex, en su última versión, armó el prototipo en React: pantallas de viajero y de tienda, mapa, wallet, escáner y la pantalla de pago.
+- La documentación de esa carpeta salió del mismo trabajo: `Front/README.md` (cómo levantarlo, el puerto y `VITE_DATA_SOURCE`) y `Front/MAPS.md` (Google Maps y OpenStreetMap).
+- Las tiendas, los cupones y el saldo de la pantalla viven en el prototipo (`src/data/`). El cobro que cotiza y abre la aprobación en la wallet de test está en `api/` y en `payments/`.
+- No quedó el texto de esas sesiones. Lo de arriba es el alcance que se ve en la carpeta.
+
+### 4. Documentación de la hackathon
 
 - Se usó Cursor para redactar este archivo y `prompts/payments.md`.
 - Se usó Claude Code para ampliar este archivo con la parte de `api/`.
@@ -59,7 +67,6 @@ No tenemos a mano el consumo de créditos de esas sesiones. Si el plan es de pag
 ## Archivos con poco o ningún uso de IA en este trabajo
 
 - `api/`: `payments/` no lo modificó. Los cambios de `api/` con IA son los de la sección 2; el resto lo escribió el equipo.
-- `Front/`: no se modificó desde `payments/` ni desde Claude Code.
 
 ## Prompt Log
 
@@ -76,3 +83,5 @@ Para `api/`, las peticiones fueron conversacionales y no se guardó el texto lit
 - Añadir el país de origen al registro y al perfil, aceptarlo por nombre y listar los países.
 - Preparar un HTML con solo los endpoints que cambiaron y publicarlo como artifact.
 - Hacer commit, push y pull request de cada cambio.
+
+Para `Front/`, el texto de las sesiones con Codex no se guardó. El resultado está en el prototipo, en `Front/README.md` y en `Front/MAPS.md`.

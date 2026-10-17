@@ -8,10 +8,10 @@
   <a href="https://expressjs.com/"><img alt="Express" src="https://img.shields.io/badge/Express-000000?style=flat-square&logo=express&logoColor=white"></a>
   <a href="https://www.postgresql.org/"><img alt="PostgreSQL" src="https://img.shields.io/badge/PostgreSQL-4169E1?style=flat-square&logo=postgresql&logoColor=white"></a>
   <a href="https://openpayments.dev/"><img alt="Open Payments" src="https://img.shields.io/badge/Open_Payments-6C47FF?style=flat-square"></a>
-  <a href="https://wallet.interledger-test.dev/"><img alt="Red de pruebas" src="https://img.shields.io/badge/red_de_pruebas-dinero_de_juego-2ea44f?style=flat-square"></a>
+  <a href="https://wallet.interledger-test.dev/"><img alt="Wallet de test" src="https://img.shields.io/badge/wallet_de_test-Interledger-2ea44f?style=flat-square"></a>
 </p>
 
-Lokora es un mercado para el comercio de barrio. Un visitante paga desde la wallet que ya tiene y la tienda recibe en su moneda, por Open Payments, en la red de pruebas de Interledger. El dinero de esa red es de juego.
+Lokora es un mercado para el comercio de barrio. Un visitante paga desde la wallet que ya tiene y la tienda recibe en su moneda, por Open Payments. Esta entrega corre sobre las wallets de test de Interledger.
 
 ## 🏪 Para quién
 
@@ -23,7 +23,7 @@ Ese cruce se cae en el mostrador. La tarjeta extranjera cobra de más, el efecti
 
 ## 🔗 Qué lo hace posible
 
-Open Payments es un estándar, no una pasarela propia. El backend firma como cliente y le pide a cada entidad que mueva el dinero de su cuenta. La wallet de cada persona es una URL que se guarda una vez. En pruebas, esa entidad es [wallet.interledger-test.dev](https://wallet.interledger-test.dev). La cotización dice el débito en la moneda de quien paga y el abono en la moneda de la tienda. La diferencia es el fee de la red. La comisión de Lokora va aparte, en el pedido, y no se gira con ese cobro.
+Open Payments es un estándar, no una pasarela propia. El backend firma como cliente y le pide a cada entidad que mueva el dinero de su cuenta. La wallet de cada persona es una URL que se guarda una vez. En esta entrega, esa entidad es la [wallet de test de Interledger](https://wallet.interledger-test.dev). La cotización dice el débito en la moneda de quien paga y el abono en la moneda de la tienda. La diferencia es el fee de la red. La comisión de Lokora va aparte, en el pedido, y no se gira con ese cobro.
 
 ## 🔄 Cómo funciona el dinero
 
@@ -42,7 +42,7 @@ El recorrido del cobro, las wallets y la aprobación están dibujados en la [doc
 
 ## ✨ Por qué ahora
 
-Hasta hace poco, cobrarle a alguien de otra entidad pedía un convenio por banco. Open Payments deja que la misma app hable con cualquiera que implemente el estándar: se cotiza la tasa en el momento, se muestra el fee y se aprueba una sola vez. La red de pruebas ya permite recorrerlo de punta a punta, con wallets en monedas distintas, sin mover dinero real.
+Hasta hace poco, cobrarle a alguien de otra entidad pedía un convenio por banco. Open Payments deja que la misma app hable con cualquiera que implemente el estándar: se cotiza la tasa en el momento, se muestra el fee y se aprueba una sola vez. Las wallets de test de Interledger ya permiten recorrerlo de punta a punta, con cuentas en monedas distintas.
 
 ## 📦 Repo
 
@@ -52,6 +52,16 @@ Hasta hace poco, cobrarle a alguien de otra entidad pedía un convenio por banco
 | `api/` | API en Node.js y Express, con PostgreSQL. Ver `api/README.md`. |
 | `payments/` | Cliente en TypeScript del mismo cobro. Ver `payments/README.md` y `payments/INTEGRACION.md`. |
 | `AI_USAGE.md` | Divulgación de uso de IA pedida por la hackathon. |
+
+## ▶️ Cómo correrlo
+
+Cada parte se instala y se arranca en su carpeta. Los pasos, las variables y el puerto están en su README.
+
+| Carpeta | Guía |
+|---|---|
+| `Front/` | [`Front/README.md`](Front/README.md). El mapa, en [`Front/MAPS.md`](Front/MAPS.md). |
+| `api/` | [`api/README.md`](api/README.md). El contrato de endpoints, en [`api/docs/frontend-context.md`](api/docs/frontend-context.md). |
+| `payments/` | [`payments/README.md`](payments/README.md) y [`payments/INTEGRACION.md`](payments/INTEGRACION.md). |
 
 ## 👥 Equipo
 
