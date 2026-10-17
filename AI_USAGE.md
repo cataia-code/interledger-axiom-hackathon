@@ -34,4 +34,4 @@ No tenemos a mano el consumo de créditos de esa sesión. Si el plan es de pago,
 
 ## Prompt Log
 
-Los prompts de esta parte están en `prompts/payments.md`.
+Las instrucciones de esta parte están en `prompts/payments.md`, redactadas de nuevo a partir de lo pedido.
