@@ -17,7 +17,9 @@ const GROUPS = {
     ['POST', '/api/v1/auth/seller/sign-in/otp', { email: '', otp: '' }],
   ],
   Catálogo: [
+    ['GET', '/api/v1/stores'],
     ['GET', '/api/v1/items'],
+    ['GET', '/api/v1/items?storeId=:id'],
     ['GET', '/api/v1/items/:id'],
     ['GET', '/api/v1/stores/:id'],
     ['GET', '/api/v1/stores/:id/categories'],
