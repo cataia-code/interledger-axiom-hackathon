@@ -79,6 +79,10 @@ const SELLERS = [
     email: 'panaderia.poblado@example.com', name: 'Camila Restrepo',
     organization: org(1, 'Panadería El Poblado S.A.S.', 'Panadería El Poblado'),
     store: store(1, 'Panadería El Poblado', 'Pan artesanal, almojábanas y repostería recién horneada.', 'Carrera 35 #8A-40, El Poblado', 6.2088, -75.567),
+    coupons: [
+      { title: '10 % en panadería', description: 'En compras desde $20.000, con tope de $5.000.', type: 'percent', value: 1000, code: 'PANADERIA10', audience: 'public', min: 20_000, max: 5000 },
+      { title: 'Bienvenida: $5.000 menos', description: 'Para tu primera compra en El Poblado.', type: 'fixed', value: 5000, audience: 'assigned', min: 15_000, assign: ['comprador@example.com'] },
+    ],
     categories: ['Panes', 'Pastelería', 'Bebidas'],
     items: [
       ['POB-001', 'Pan de bono (6 unidades)', 'Clásico antioqueño de queso y almidón de yuca.', 9000, 'Panes', 50],
@@ -95,6 +99,9 @@ const SELLERS = [
     email: 'cafe.laureles@example.com', name: 'Andrés Gómez',
     organization: org(2, 'Café Laureles S.A.S.', 'Café Laureles'),
     store: store(2, 'Café Laureles', 'Café de especialidad de fincas antioqueñas, tostado en casa.', 'Circular 4 #70-15, Laureles', 6.2442, -75.59),
+    coupons: [
+      { title: '15 % en café en grano', description: 'Solo en los cafés de la casa. Tope de $12.000.', type: 'percent', value: 1500, code: 'CAFE15', audience: 'public', max: 12_000, skus: ['LAU-001', 'LAU-002', 'LAU-003'] },
+    ],
     categories: ['Café en grano', 'Accesorios', 'Preparados'],
     items: [
       ['LAU-001', 'Café Supremo 250 g', 'Notas de panela y chocolate.', 28000, 'Café en grano', 60],
@@ -111,6 +118,9 @@ const SELLERS = [
     email: 'mercado.belen@example.com', name: 'Luz Marina Ospina',
     organization: org(3, 'Mercado Campesino Belén S.A.S.', 'Mercado Campesino Belén'),
     store: store(3, 'Mercado Campesino Belén', 'Frutas, verduras y productos de campo directo de las veredas.', 'Carrera 76 #30-25, Belén', 6.23, -75.605),
+    coupons: [
+      { title: '$3.000 menos en tu mercado', description: 'En compras desde $25.000.', type: 'fixed', value: 3000, audience: 'assigned', min: 25_000, assign: ['comprador@example.com'] },
+    ],
     categories: ['Frutas', 'Verduras', 'Despensa'],
     items: [
       ['BEL-001', 'Mora de Castilla (500 g)', 'Fresca, ideal para jugos y postres.', 7000, 'Frutas', 40],
@@ -176,6 +186,8 @@ const SELLERS = [
 const STORES = Math.min(Number(process.env.SEED_STORES) || 3, SELLERS.length);
 const ITEMS = Math.min(Number(process.env.SEED_ITEMS) || 5, 8);
 
+await account('buyer', { email: 'comprador@example.com', password: PASSWORD, name: 'Compradora Demo' });
+
 for (const [index, s] of SELLERS.slice(0, STORES).entries()) {
   const palette = PALETTES[index % PALETTES.length];
   const token = await account('seller', { email: s.email, password: PASSWORD, name: s.name, organization: s.organization, store: s.store });
@@ -194,6 +206,7 @@ for (const [index, s] of SELLERS.slice(0, STORES).entries()) {
 
   // Ítems existentes por SKU, para no duplicar ni repetir imágenes.
   const owned = new Map((await call('GET', '/seller/items?limit=50', { token })).data.items.map((i) => [i.sku, i]));
+  const idBySku = new Map();
   for (const [sku, name, description, priceAmount, cat, initialStock, discount] of s.items.slice(0, ITEMS)) {
     let item = owned.get(sku);
     if (item) {
@@ -207,13 +220,31 @@ for (const [index, s] of SELLERS.slice(0, STORES).entries()) {
       if (discount) await call('POST', `/seller/items/${item.id}/discounts`, { token, body: discount.type === 'fixed' ? { ...discount, value: COP(discount.value) } : discount });
       console.log(`+ ${sku} ${name}`);
     }
+    idBySku.set(sku, item.id);
     // 3 imágenes por producto, con un degradado distinto cada una.
     for (let n = (item.images ?? []).length + 1; n <= 3; n++) {
       const shifted = palette.map((c, k) => (n % 2 === 0 ? palette[1 - k] : c));
       await upload('POST', `/seller/items/${item.id}/images`, token, await placeholder(1024, 1024, shifted, name, `${s.store.name} · ${n}/3`));
     }
   }
+  // Cupones de ejemplo (se omiten los que ya existen por título).
+  const have = new Set((await call('GET', '/seller/coupons?limit=50', { token })).data.coupons.map((c) => c.title));
+  for (const cp of s.coupons ?? []) {
+    if (have.has(cp.title)) { console.log(`= cupón "${cp.title}" ya existe`); continue; }
+    const itemIds = (cp.skus ?? []).map((sku) => idBySku.get(sku)).filter(Boolean);
+    const money = (pesos) => (pesos == null ? undefined : COP(pesos));
+    const r = await call('POST', '/seller/coupons', {
+      token,
+      body: {
+        title: cp.title, description: cp.description, type: cp.type, code: cp.code, audience: cp.audience,
+        value: cp.type === 'fixed' ? COP(cp.value) : cp.value,
+        minSubtotalAmount: money(cp.min), maxDiscountAmount: money(cp.max), ...(itemIds.length && { itemIds }),
+      },
+    });
+    if (r.status !== 201) throw new Error(`cupón "${cp.title}" ${r.status}: ${JSON.stringify(r.data)}`);
+    if (cp.assign) await call('POST', `/seller/coupons/${r.data.coupon.id}/assign`, { token, body: { emails: cp.assign } });
+    console.log(`+ cupón ${cp.code ?? cp.title}`);
+  }
 }
 
-await account('buyer', { email: 'comprador@example.com', password: PASSWORD, name: 'Compradora Demo' });
 console.log(`\nVendedores: ${SELLERS.slice(0, STORES).map((x) => x.email).join(', ')}\nListo en ${BASE}\nCuentas (contraseña ${PASSWORD}): los vendedores (uno por tienda) y comprador@example.com (comprador)`);

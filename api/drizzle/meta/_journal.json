@@ -85,6 +85,13 @@
       "when": 1792202742907,
       "tag": "0011_user_country",
       "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "7",
+      "when": 1792206108908,
+      "tag": "0012_coupons",
+      "breakpoints": true
     }
   ]
 }

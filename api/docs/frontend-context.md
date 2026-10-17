@@ -36,7 +36,7 @@ Rutas genéricas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`): `{ "mes
 | 401 | Sin sesión / credenciales malas | `UNAUTHORIZED`, `INVALID_EMAIL_OR_PASSWORD` |
 | 403 | Rol incorrecto | `FORBIDDEN`, `WRONG_ROLE`, `STORE_REQUIRED`, `ORGANIZATION_REQUIRED` |
 | 404 | No existe / ajeno | `NOT_FOUND`, `ORDER_NOT_FOUND` |
-| 409 | Conflicto de estado | `INSUFFICIENT_STOCK`, `CART_OTHER_STORE`, `ITEM_UNAVAILABLE`, `INVALID_TRANSITION`, `ORDER_NOT_PAYABLE`, `SKU_ALREADY_EXISTS`, `DISCOUNT_OVERLAP`, `CATEGORY_SLUG_EXISTS`, `REFUND_EXCEEDS_PAYMENT`, `USE_CANCEL`, `TAX_ID_ALREADY_EXISTS`, `LEGAL_ID_ALREADY_EXISTS` |
+| 409 | Conflicto de estado | `INSUFFICIENT_STOCK`, `CART_OTHER_STORE`, `ITEM_UNAVAILABLE`, `INVALID_TRANSITION`, `ORDER_NOT_PAYABLE`, `SKU_ALREADY_EXISTS`, `DISCOUNT_OVERLAP`, `CATEGORY_SLUG_EXISTS`, `REFUND_EXCEEDS_PAYMENT`, `USE_CANCEL`, `TAX_ID_ALREADY_EXISTS`, `LEGAL_ID_ALREADY_EXISTS`, y los de cupones (`COUPON_*`, ver la sección Cupones) |
 | 413 | Imagen > 5 MB | `IMAGE_TOO_LARGE` |
 | 422 | Correo ya registrado | `USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL` |
 | 429 | Rate limit | `RATE_LIMITED` |
@@ -113,7 +113,12 @@ Item = {
 }
 PublicStore = { id, name, description, city, address, latitude, longitude, currency, status,
   bannerUrl,   // imagen de portada 1600×600 (WebP) o null
-  iconUrl }    // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+  iconUrl,     // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+  wallets }    // wallets de la tienda (las de su dueño), la principal primero; [] si no ha vinculado ninguna
+StoreWallet = { id, name /* apodo o null */, address /* URL de la wallet de Open Payments */,
+  assetCode /* 'USD', 'COP'… */, assetScale /* decimales de esa moneda */, isPrimary }
+// La tienda cobra en la wallet principal. Úsalas para mostrar la divisa de cobro y convertir precios.
+// Aparecen en GET /stores/:id y en cada tienda de GET /stores (también con sort=score).
 // Las URLs son relativas al host: <host>/uploads/…
 Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 StoreStats  = {
@@ -151,11 +156,18 @@ StoreStats  = {
 
 ```ts
 Cart = { id, storeId, currency, lines: [{ itemId, name, sku, quantity,
-  originalUnitAmount, discountUnitAmount, unitAmount, lineAmount, available, purchasable }], …totales }
+  originalUnitAmount, discountUnitAmount, unitAmount, lineAmount, available, purchasable }],
+  subtotalAmount,          // precio de lista
+  discountAmount,          // solo descuentos de ítem
+  coupon,                  // { id, code, title, type, value } | null  → cupón puesto en el carrito
+  couponDiscountAmount,    // lo que descuenta el cupón hoy (0 si no aplica)
+  couponError,             // null | código COUPON_* si el cupón puesto ya no aplica (p. ej. COUPON_MIN_NOT_MET)
+  totalAmount }            // subtotal − descuentos de ítem − cupón: lo que se paga
 // Un carrito = una sola sucursal. Deshabilita "comprar" si alguna línea tiene purchasable:false.
 
 Order = { id, number, buyerId, storeId, status, currency,
-  subtotalAmount, discountAmount, totalAmount, commissionRate, commissionAmount,
+  subtotalAmount, discountAmount /* ítems */, couponId, couponCode, couponDiscountAmount /* 0 si no hubo cupón */,
+  totalAmount, commissionRate, commissionAmount /* sobre totalAmount, ya con el cupón */,
   expiresAt, createdAt,
   items?: [{ itemId, name, sku, quantity, originalUnitAmount, discountUnitAmount, unitAmount, lineAmount }],
   history?: [{ from, to, actorId, note, at }] }          // items/history solo en el detalle
@@ -239,6 +251,64 @@ Estados de ítem: `draft` / `active` / `inactive`. Solo los `active` de una sucu
 | POST | `/seller/orders/:id/refunds` | `{amount?, reason?}`; sin `amount` reembolsa lo que falta. 409 `REFUND_EXCEEDS_PAYMENT`; para el total de un pedido sin completar, usar cancelar (`USE_CANCEL`) |
 
 Transiciones del seller: `paid→preparing`, `preparing→completed`, y `cancelled` desde `paid`/`preparing`.
+
+## Cupones
+
+Cupones **de tienda** (los paga el vendedor), de **porcentaje** o **monto fijo**. Máximo **uno por pedido**. Se aplica sobre el precio ya rebajado por los descuentos de ítem. Importes en unidades menores; `value` de un porcentaje va en puntos base (1000 = 10 %, máximo 9000).
+
+**Quién puede usar un cupón.** Debe estar en la *cartera* del comprador: o el vendedor se lo **asignó** por correo (`assigned`), o es **público** (`audience: "public"`) y el comprador lo **guarda** (`claimed`) o escribe su `code` al aplicarlo (se guarda solo). Los asignados a otras personas no se ven ni se pueden adivinar (404).
+
+### Comprador (token `buyer`)
+
+| Método | Ruta | Notas |
+|---|---|---|
+| GET | `/coupons` | Mis cupones y los públicos que puedo guardar. Query: `storeId`, `status` (`available`\|`used`\|`exhausted`\|`expired`\|`upcoming`\|`paused`), `limit` (1-50), `cursor`. → `{coupons:[BuyerCoupon], nextCursor}` |
+| POST | `/coupons/:id/claim` | Guarda un cupón público. 201 si es nuevo, 200 si ya lo tenía. → `{coupon, created}` |
+| PUT | `/cart/coupon` | Aplica un cupón al carrito: `{couponId}` o `{code}`. Reemplaza al anterior. Devuelve `{cart}` con los totales. Si no aplica responde un 4xx y **no cambia el carrito** |
+| DELETE | `/cart/coupon` | Quita el cupón. Devuelve `{cart}` |
+| POST | `/orders` | **Cambia:** usa el cupón del carrito. Lo vuelve a validar y reserva el uso; si falla responde el error `COUPON_*` y no crea el pedido |
+
+```ts
+BuyerCoupon = { id, storeId, code, title, description, type, value, maxDiscountAmount, minSubtotalAmount,
+  startsAt, endsAt, maxRedemptions, perUserLimit, audience, status,
+  store: { id, name, currency, iconUrl },
+  inWallet, source /* 'assigned'|'claimed'|null */,
+  state,      // available | used | exhausted | expired | upcoming | paused  (para mostrar el botón o la etiqueta)
+  itemIds }   // productos a los que aplica; vacío = toda la tienda
+```
+
+**Flujo en el frontend:** listar `/coupons` → guardar los públicos → con el carrito armado, `PUT /cart/coupon` → mostrar `couponDiscountAmount` y `totalAmount` → `POST /orders`. Vuelve a leer `GET /cart` después de cambiar cantidades: si el carrito baja del mínimo el cupón sigue puesto pero `couponError` lo explica y el descuento pasa a 0.
+
+**Cuándo se gasta un uso:** al hacer checkout queda *reservado*. Si el pedido se **cancela o vence sin pagarse**, el uso se devuelve y el cupón vuelve a estar disponible. Un reembolso posterior **no** lo devuelve.
+
+### Vendedor (token `seller`)
+
+| Método | Ruta | Notas |
+|---|---|---|
+| POST | `/seller/coupons` | Crea. Body: `title` (2-80), `description?` (≤300), `code?` (3-30 letras, dígitos, `-`, `_`; se guarda en mayúsculas, único por tienda), `type` (`percent`\|`fixed`), `value`, `maxDiscountAmount?` (solo `percent`), `minSubtotalAmount?`, `startsAt?` (por defecto ahora), `endsAt?`, `maxRedemptions?` (usos totales), `perUserLimit?` (por defecto 1), `audience?` (`assigned` por defecto \| `public`), `itemIds?` (solo esos productos; vacío = toda la tienda). → 201 `{coupon}` |
+| GET | `/seller/coupons` | Query `status` (`active`\|`paused`\|`expired`), `limit`, `cursor`. → `{coupons, nextCursor}` |
+| GET | `/seller/coupons/:id` | Detalle con `itemIds`, `redeemed` (usos vigentes) y `walletUsers` |
+| PATCH | `/seller/coupons/:id` | Edita. Con usos ya hechos solo permite `title`, `description`, `status`, `endsAt` y `maxRedemptions` (409 `COUPON_IN_USE` si se intenta otro campo) |
+| DELETE | `/seller/coupons/:id` | 204. 409 `COUPON_IN_USE` si hay pedidos esperando pago con él; el código queda libre |
+| POST | `/seller/coupons/:id/assign` | `{emails:[…]}` (1-100). → `{assigned, alreadyHad, notFound}`; solo cuentas de comprador |
+| GET | `/seller/coupons/:id/redemptions` | Usos: `{redemptions:[{id, orderId, orderNumber, userId, discountAmount, status('reserved'\|'released'), createdAt, releasedAt}], nextCursor}` |
+
+### Errores de cupones
+
+| Código | HTTP | Significa |
+|---|---|---|
+| `COUPON_NOT_FOUND` | 404 | No existe, es de otra persona o el código no es de esta tienda |
+| `COUPON_NOT_ELIGIBLE` | 403 | Es público pero hay que guardarlo antes (`POST /coupons/:id/claim`) |
+| `COUPON_WRONG_STORE` | 409 | El cupón es de otra tienda distinta a la del carrito |
+| `COUPON_PAUSED` · `COUPON_NOT_STARTED` · `COUPON_EXPIRED` | 409 | Pausado por el vendedor, aún no empieza o ya venció |
+| `COUPON_USER_LIMIT` · `COUPON_EXHAUSTED` | 409 | Ya lo usaste las veces permitidas · se agotaron los usos totales |
+| `COUPON_MIN_NOT_MET` | 409 | El pedido no llega al mínimo (calculado sobre el precio con descuentos de ítem) |
+| `COUPON_NOT_APPLICABLE` | 409 | Ningún producto del carrito entra en el cupón |
+| `COUPON_CODE_EXISTS` | 409 | (vendedor) esa tienda ya tiene un cupón con ese código |
+| `COUPON_IN_USE` | 409 | (vendedor) el cupón ya se usó o tiene pedidos pendientes |
+| `COUPON_REQUIRED` · `CART_EMPTY` | 400 · 409 | Falta `couponId` o `code` · el carrito está vacío |
+
+**Descuento:** `floor(base × value / 10000)` si es porcentaje, `value` si es fijo; nunca pasa de `maxDiscountAmount`, de la base aplicable ni deja el pedido en 0 (como mínimo se paga 1 unidad menor). La comisión del marketplace se calcula sobre el total ya con el cupón.
 
 ## Utilidad
 

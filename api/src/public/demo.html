@@ -58,6 +58,13 @@
   .s-ok { background: var(--ok); } .s-warn { background: var(--warn); } .s-err { background: var(--err); }
   .meta { color: var(--muted); font-size: 13px; }
   .spacer { flex: 1; }
+  .hrow { display: grid; grid-template-columns: 1fr 1.4fr auto auto; gap: 8px; margin-bottom: 8px; }
+  .hrow input { min-width: 0; }
+  .hrow button, #addHeader { padding: 6px 12px; font-size: 13px; }
+  .hrow button.rm { padding: 6px 10px; }
+  .hrow.invalid input:first-child { border-color: #d6454f; }
+  .hnote { color: #d6454f; font-size: 12px; margin-top: 6px; }
+  @media (max-width: 560px) { .hrow { grid-template-columns: 1fr 1fr; } .hrow input { grid-column: 1 / -1; } }
   pre { margin: 0; background: var(--code-bg); color: var(--code-text); border-radius: 12px; padding: 16px;
     overflow: auto; max-height: 460px; font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, monospace; }
   pre.empty { color: var(--muted); font-style: italic; }
@@ -92,6 +99,17 @@
     <div class="field">
       <label for="token">Bearer token (opcional)</label>
       <input id="token" type="password" placeholder="Pega aquí tu token" autocomplete="off">
+    </div>
+    <div class="field" id="headersField">
+      <label>Cabeceras personalizadas (opcional)</label>
+      <div id="headers"></div>
+      <button id="addHeader" type="button" class="ghost">+ Añadir cabecera</button>
+      <div id="headersNote" class="hnote" hidden></div>
+      <div class="hint">Por ejemplo <code>Idempotency-Key</code> (obligatoria en <code>POST /orders</code> y en <code>/pay</code>). Una cabecera <code>Authorization</code> reemplaza al token de arriba. <b>UUID</b> rellena el valor con uno nuevo.</div>
+      <datalist id="headerNames">
+        <option value="Idempotency-Key"><option value="Accept-Language"><option value="X-Request-Id"><option value="X-Webhook-Secret">
+        <option value="If-None-Match"><option value="Cache-Control"><option value="Authorization"><option value="Content-Type">
+      </datalist>
     </div>
     <div class="field" id="bodyField">
       <label for="body">Body JSON (opcional)</label>

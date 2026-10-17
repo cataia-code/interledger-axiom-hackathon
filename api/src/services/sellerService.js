@@ -1,7 +1,8 @@
-import { and, desc, eq, ilike, isNull, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, ilike, inArray, isNull, lt, or } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { user } from '../db/schema.js';
 import { organization, store } from '../db/business.js';
+import { userWallet } from '../db/wallets.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { bad, integer } from './validation.js';
 import { scoresFor } from './statsService.js';
@@ -95,6 +96,24 @@ export async function getPublicStore(id) {
 }
 
 // Listado público de sucursales activas, de la más nueva a la más antigua (cursor = id).
+// Wallets de Open Payments de cada tienda: las de su dueño, la principal primero. La tienda cobra en la principal;
+// el frontend las usa para mostrar la divisa y convertir precios. La dirección de una wallet es pública por diseño.
+const presentStoreWallet = (w) => ({ id: w.id, name: w.name, address: w.address, assetCode: w.assetCode, assetScale: w.assetScale, isPrimary: w.isPrimary });
+
+export async function walletsByStore(storeRows) {
+  const map = new Map(storeRows.map((s) => [s.id, []]));
+  if (storeRows.length === 0) return map;
+  const rows = await db
+    .select({ storeId: store.id, wallet: userWallet })
+    .from(store)
+    .innerJoin(organization, eq(organization.id, store.organizationId))
+    .innerJoin(userWallet, eq(userWallet.userId, organization.userId))
+    .where(inArray(store.id, storeRows.map((s) => s.id)))
+    .orderBy(desc(userWallet.isPrimary), asc(userWallet.id));
+  for (const { storeId, wallet } of rows) map.get(storeId).push(presentStoreWallet(wallet));
+  return map;
+}
+
 const STORE_SORTS = ['newest', 'score'];
 
 export async function listPublicStores(query) {
@@ -129,8 +148,9 @@ export async function listPublicStores(query) {
       .sort((a, b) => b.score - a.score || b.row.id - a.row.id)
       .filter((r) => !after || r.score < after.score || (r.score === after.score && r.row.id < after.id));
     const page = ranked.slice(0, limit);
+    const wallets = await walletsByStore(page.map((r) => r.row));
     return {
-      stores: page.map(({ row, score, stars, level }) => ({ ...presentPublicStore(row), score, stars, level })),
+      stores: page.map(({ row, score, stars, level }) => ({ ...presentPublicStore(row), wallets: wallets.get(row.id), score, stars, level })),
       nextCursor: ranked.length > limit ? `${page.at(-1).score}:${page.at(-1).row.id}` : null,
     };
   }
@@ -142,9 +162,9 @@ export async function listPublicStores(query) {
   }
   const rows = await db.select().from(store).where(and(...filters)).orderBy(desc(store.id)).limit(limit + 1);
   const page = rows.slice(0, limit);
-  const scores = await scoresFor(page);
+  const [scores, wallets] = await Promise.all([scoresFor(page), walletsByStore(page)]);
   return {
-    stores: page.map((row) => ({ ...presentPublicStore(row), ...scores.get(row.id) })),
+    stores: page.map((row) => ({ ...presentPublicStore(row), wallets: wallets.get(row.id), ...scores.get(row.id) })),
     nextCursor: rows.length > limit ? String(page.at(-1).id) : null,
   };
 }

@@ -8,6 +8,7 @@ import { bad, integer, parseId } from './validation.js';
 import { cartRows, purchasable } from './cartService.js';
 import { commissionOf, currentDiscounts, priceLine, totalsOf } from './pricingService.js';
 import { reserveStock } from './stockService.js';
+import { evaluateCoupon, loadCouponFacts, recordRedemption } from './couponEngine.js';
 import { ORDER_STATUSES, transitionOrder } from './orderStateMachine.js';
 
 export const presentOrder = (o, { items, history } = {}) => ({
@@ -18,7 +19,10 @@ export const presentOrder = (o, { items, history } = {}) => ({
   status: o.status,
   currency: o.currency,
   subtotalAmount: o.subtotalAmount,
-  discountAmount: o.discountAmount,
+  discountAmount: o.discountAmount, // descuentos de ítem
+  couponId: o.couponId,
+  couponCode: o.couponCode,
+  couponDiscountAmount: o.couponDiscountAmount,
   totalAmount: o.totalAmount,
   commissionRate: o.commissionRate,
   commissionAmount: o.commissionAmount,
@@ -90,6 +94,18 @@ export async function checkout(userId, rawKey) {
 
   try {
     const created = await db.transaction(async (tx) => {
+      // Cupón del carrito: se bloquea y se valida de nuevo aquí, que es lo que cuenta (el carrito solo lo mostraba).
+      let applied = null;
+      if (activeCart.couponId) {
+        const facts = await loadCouponFacts(tx, activeCart.couponId, buyerId, { lock: true });
+        const { discount } = evaluateCoupon(facts, {
+          storeId: store.id,
+          lines: lines.map((l) => ({ itemId: l.r.item.id, lineAmount: l.price.line })),
+          itemTotal: totals.total,
+        });
+        applied = { id: facts.coupon.id, label: facts.coupon.code ?? facts.coupon.title, discount };
+      }
+      const total = totals.total - (applied?.discount ?? 0);
       const [o] = await tx
         .insert(order)
         .values({
@@ -98,9 +114,12 @@ export async function checkout(userId, rawKey) {
           storeId: store.id,
           subtotalAmount: totals.subtotal,
           discountAmount: totals.discount,
-          totalAmount: totals.total,
+          couponId: applied?.id ?? null,
+          couponCode: applied?.label ?? null,
+          couponDiscountAmount: applied?.discount ?? 0,
+          totalAmount: total,
           commissionRate: config.commissionRate,
-          commissionAmount: commissionOf(totals.total, config.commissionRate),
+          commissionAmount: commissionOf(total, config.commissionRate),
           currency: store.currency,
           idempotencyKey: key,
           expiresAt,
@@ -121,6 +140,7 @@ export async function checkout(userId, rawKey) {
           lineAmount: price.line,
         })),
       );
+      if (applied) await recordRedemption(tx, { couponId: applied.id, userId: buyerId, orderId: o.id, discountAmount: applied.discount });
       await tx.insert(orderStatusHistory).values({ orderId: o.id, fromStatus: null, toStatus: 'pending_payment', actorId: buyerId });
       await tx.update(cart).set({ status: 'converted' }).where(eq(cart.id, activeCart.id));
       return o;

@@ -33,6 +33,17 @@ const GROUPS = {
     ['GET', '/api/v1/stores/:id'],
     ['GET', '/api/v1/stores/:id/categories'],
   ],
+  'Pagos (webhook del proveedor)': [
+    ['POST', '/api/v1/payments/webhook/placeholder', { eventId: 'evt-1', type: 'payment.captured', providerRef: 'ph_…' }, null, { 'X-Webhook-Secret': '' }],
+  ],
+  'Cupones (comprador)': [
+    ['GET', '/api/v1/coupons'],
+    ['GET', '/api/v1/coupons?status=available'],
+    ['POST', '/api/v1/coupons/:id/claim', {}],
+    ['PUT', '/api/v1/cart/coupon', { couponId: 1 }],
+    ['PUT', '/api/v1/cart/coupon', { code: 'PANADERIA10' }],
+    ['DELETE', '/api/v1/cart/coupon'],
+  ],
   Cuenta: [
     ['GET', '/api/v1/me'],
     ['PATCH', '/api/v1/me', { name: '', phone: '', country: 'CO' }],
@@ -42,16 +53,23 @@ const GROUPS = {
     ['DELETE', '/api/v1/cart'],
     ['PUT', '/api/v1/cart/items/:itemId', { quantity: 1 }],
     ['DELETE', '/api/v1/cart/items/:itemId'],
-    ['POST', '/api/v1/orders', {}],
+    ['POST', '/api/v1/orders', {}, null, { 'Idempotency-Key': '{uuid}' }],
     ['GET', '/api/v1/orders'],
     ['GET', '/api/v1/orders/:id'],
     ['POST', '/api/v1/orders/:id/cancel', {}],
-    ['POST', '/api/v1/orders/:id/pay', {}],
+    ['POST', '/api/v1/orders/:id/pay', {}, null, { 'Idempotency-Key': '{uuid}' }],
     ['GET', '/api/v1/orders/:id/payments'],
   ],
   'Vendedor (token)': [
     ['GET', '/api/v1/seller/organization'],
     ['GET', '/api/v1/seller/stats'],
+    ['GET', '/api/v1/seller/coupons'],
+    ['POST', '/api/v1/seller/coupons', { title: 'Mi cupón', type: 'percent', value: 1000, audience: 'public', code: 'MICUPON', minSubtotalAmount: 2000000, maxDiscountAmount: 500000 }],
+    ['GET', '/api/v1/seller/coupons/:id'],
+    ['PATCH', '/api/v1/seller/coupons/:id', { status: 'paused' }],
+    ['DELETE', '/api/v1/seller/coupons/:id'],
+    ['POST', '/api/v1/seller/coupons/:id/assign', { emails: ['comprador@example.com'] }],
+    ['GET', '/api/v1/seller/coupons/:id/redemptions'],
     ['GET', '/api/v1/seller/store'],
     ['PUT', '/api/v1/seller/store/banner', null, 'file'],
     ['PUT', '/api/v1/seller/store/icon', null, 'file'],
@@ -89,7 +107,7 @@ for (const [group, list] of Object.entries(GROUPS)) {
 
 preset.addEventListener('change', () => {
   if (preset.value === '') return;
-  const [method, path, body, kind] = SPECS[Number(preset.value)];
+  const [method, path, body, kind, headers] = SPECS[Number(preset.value)];
   $('method').value = method;
   $('path').value = path;
   $('body').value = body ? JSON.stringify(body, null, 2) : '';
@@ -97,7 +115,74 @@ preset.addEventListener('change', () => {
   $('bodyField').hidden = kind === 'file';
   $('fileField').hidden = kind !== 'file';
   if (kind !== 'file') $('file').value = '';
+  // Las cabeceras que puso una opción de la lista se reemplazan; las que escribiste tú se conservan.
+  for (const row of [...$('headers').children]) if (row.dataset.auto) row.remove();
+  for (const [name, value] of Object.entries(headers ?? {})) addHeaderRow(name, value === '{uuid}' ? uuid() : value, true);
 });
+
+// ---- cabeceras personalizadas ----
+const uuid = () => (globalThis.crypto?.randomUUID ? crypto.randomUUID() : `${Date.now().toString(16)}-${Math.random().toString(16).slice(2, 10)}-demo`);
+// El navegador no deja fijar estas cabeceras desde JavaScript.
+const FORBIDDEN = new Set(['host', 'content-length', 'connection', 'cookie', 'origin', 'referer', 'user-agent', 'accept-encoding', 'te', 'upgrade', 'via', 'date', 'expect', 'transfer-encoding', 'keep-alive']);
+const HEADER_NAME = /^[!#$%&'*+.^_`|~0-9A-Za-z-]+$/;
+
+function addHeaderRow(name = '', value = '', auto = false) {
+  const row = document.createElement('div');
+  row.className = 'hrow';
+  if (auto) row.dataset.auto = '1';
+  const n = document.createElement('input');
+  n.placeholder = 'Nombre';
+  n.value = name;
+  n.setAttribute('list', 'headerNames');
+  n.setAttribute('aria-label', 'Nombre de la cabecera');
+  n.spellcheck = false;
+  const v = document.createElement('input');
+  v.placeholder = 'Valor';
+  v.value = value;
+  v.setAttribute('aria-label', 'Valor de la cabecera');
+  v.spellcheck = false;
+  const gen = document.createElement('button');
+  gen.type = 'button';
+  gen.className = 'ghost';
+  gen.textContent = 'UUID';
+  gen.title = 'Rellenar el valor con un UUID nuevo';
+  gen.addEventListener('click', () => { v.value = uuid(); });
+  const rm = document.createElement('button');
+  rm.type = 'button';
+  rm.className = 'ghost rm';
+  rm.textContent = '✕';
+  rm.setAttribute('aria-label', 'Quitar cabecera');
+  rm.addEventListener('click', () => row.remove());
+  // Editar a mano una cabecera puesta por la lista la vuelve tuya.
+  for (const el of [n, v]) el.addEventListener('input', () => { delete row.dataset.auto; });
+  row.append(n, v, gen, rm);
+  $('headers').append(row);
+}
+
+$('addHeader').addEventListener('click', () => addHeaderRow());
+
+// Lee las filas y devuelve las cabeceras; si hay algún nombre inválido o prohibido, devuelve el error.
+function readHeaders() {
+  const out = {};
+  const problems = [];
+  for (const row of $('headers').children) {
+    const [n, v] = row.querySelectorAll('input');
+    const name = n.value.trim();
+    row.classList.remove('invalid');
+    if (!name) continue;
+    const lower = name.toLowerCase();
+    if (!HEADER_NAME.test(name)) {
+      problems.push(`«${name}» no es un nombre de cabecera válido`);
+      row.classList.add('invalid');
+    } else if (FORBIDDEN.has(lower) || lower.startsWith('sec-') || lower.startsWith('proxy-')) {
+      problems.push(`el navegador no permite enviar «${name}»`);
+      row.classList.add('invalid');
+    } else {
+      out[name] = v.value.trim();
+    }
+  }
+  return { headers: out, problems };
+}
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
 
@@ -127,6 +212,11 @@ $('form').addEventListener('submit', async (e) => {
   const method = $('method').value;
   const token = $('token').value.trim();
   const body = $('body').value.trim();
+  const custom = readHeaders();
+  $('headersNote').hidden = custom.problems.length === 0;
+  const note = custom.problems.join('. ');
+  $('headersNote').textContent = note.charAt(0).toUpperCase() + note.slice(1);
+  if (custom.problems.length > 0) return;
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
   const file = $('file').files[0];
@@ -138,6 +228,14 @@ $('form').addEventListener('submit', async (e) => {
     headers['Content-Type'] = 'application/json';
     payload = body;
   }
+  // Las cabeceras personalizadas van al final y pueden reemplazar a las anteriores (Authorization, Content-Type).
+  // Con un archivo, el navegador fija el Content-Type con su separador, así que ese no se toca.
+  for (const [name, value] of Object.entries(custom.headers)) {
+    if (file && name.toLowerCase() === 'content-type') continue;
+    for (const existing of Object.keys(headers)) if (existing.toLowerCase() === name.toLowerCase()) delete headers[existing];
+    headers[name] = value;
+  }
+  const extra = Object.keys(custom.headers).length;
 
   setLoading(true);
   $('status').textContent = '';
@@ -154,7 +252,7 @@ $('form').addEventListener('submit', async (e) => {
     const text = await r.text();
     const ms = Math.round(performance.now() - t0);
     showStatus(`${r.status} ${r.statusText}`.trim(), r.ok ? 'ok' : r.status < 500 ? 'warn' : 'err');
-    $('meta').textContent = `${ms} ms · ${text.length} bytes`;
+    $('meta').textContent = `${ms} ms · ${text.length} bytes${extra ? ` · ${extra} cabecera${extra > 1 ? 's' : ''} propia${extra > 1 ? 's' : ''}` : ''}`;
     let shown = text;
     try { shown = JSON.stringify(JSON.parse(text), null, 2); $('out').innerHTML = highlight(shown); }
     catch { $('out').textContent = text || '(respuesta vacía)'; }
