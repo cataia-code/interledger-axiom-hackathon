@@ -58,7 +58,7 @@ Por defecto `PAYMENT_PROVIDER=placeholder` (simulado). Para usar la red de prueb
 | `OP_KEY_ID` | key ID de Developer Keys |
 | `OP_PRIVATE_KEY` | contenido de `private.key`: el PEM completo, el PEM en base64 o solo el cuerpo base64 sin las líneas BEGIN/END, todo en una línea; pégalo tú, no se sube al repo |
 | `PUBLIC_API_URL` | URL pública de la API sin `/api/v1`, por ejemplo `https://${{RAILWAY_PUBLIC_DOMAIN}}` (a donde vuelve la wallet). Si falta, se usa `BETTER_AUTH_URL` |
-| `FRONTEND_URL` | URL del front (opcional; sin ella el retorno responde JSON) |
+| `FRONTEND_URL` | URL del front (opcional). El navegador ve una página de resultado que se cierra sola; con esta URL esa página ofrece "Volver a la app" |
 
 La llave pública debe estar publicada en `{OP_CLIENT_WALLET_ADDRESS}/jwks.json`. Con este proveedor el webhook del placeholder responde 404.
 

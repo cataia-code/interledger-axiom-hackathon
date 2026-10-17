@@ -15,6 +15,8 @@ const { payment } = await import('../src/db/payments.js');
 const { paymentSession } = await import('../src/db/wallets.js');
 const { setClientFactory, pollOptions, interactionHash, normalizePrivateKey } = await import('../src/payments/openpayments.js');
 const { authed, newBuyer, newSeller, uniq } = await import('./helpers.js');
+const { config } = await import('../src/config/index.js');
+const { renderPaymentResult } = await import('../src/views/paymentResult.js');
 
 const D = 'optest.local';
 const api = '/api/v1';
@@ -299,4 +301,115 @@ test('la llave privada se acepta como PEM, base64 del PEM o solo el cuerpo base6
     const key = createPrivateKey(normalizePrivateKey(value));
     assert.equal(key.asymmetricKeyType, 'ed25519', name);
   }
+});
+
+// ---- página de resultado al volver de la wallet (navegador) ----
+const html = (req) => req.set('Accept', 'text/html,application/xhtml+xml');
+const retornoUrl = (orderId) => `${api}/payments/openpayments/return/${orderId}`;
+
+test('vuelta en navegador: pago exitoso muestra una página que se cierra sola a los 3 segundos', async () => {
+  const { buyer, o } = await setup();
+  await pay(buyer, o.id);
+  const res = await html(back(o.id, (await sessionOf(o.id)).s));
+  assert.equal(res.status, 200);
+  assert.match(res.headers['content-type'], /text\/html/);
+  assert.equal(res.headers['cache-control'], 'no-store');
+  assert.equal(res.headers['cross-origin-opener-policy'], 'unsafe-none');
+  assert.match(res.text, /<h1>Pago exitoso<\/h1>/);
+  assert.match(res.text, /data-status="paid"/);
+  assert.match(res.text, /data-seconds="3"/);
+  assert.match(res.text, /Esta ventana se cerrará en <b id="count">3<\/b> s/);
+  assert.match(res.text, /<script src="\/payment-result\.js"><\/script>/);
+  assert.match(res.text, new RegExp(`Pedido ${o.number}`));
+  assert.equal(await orderStatus(o.id), 'paid', 'the payment is still closed by the same logic');
+  // El script que cierra la ventana se sirve desde la propia API (la política de seguridad no admite scripts en línea).
+  const script = await request(app).get('/payment-result.js');
+  assert.equal(script.status, 200);
+  assert.match(script.text, /window\.close\(\)/);
+});
+
+test('vuelta en navegador: declinado, fallido y en proceso tienen su propio mensaje', async () => {
+  const a = await setup();
+  await pay(a.buyer, a.o.id);
+  const denied = await html(request(app).get(retornoUrl(a.o.id)).query({ result: 'grant_rejected' }));
+  assert.equal(denied.status, 200);
+  assert.match(denied.text, /<h1>Pago declinado<\/h1>/);
+  assert.match(denied.text, /no se cobró nada/);
+  assert.equal(await orderStatus(a.o.id), 'pending_payment');
+
+  const b = await setup();
+  await pay(b.buyer, b.o.id);
+  sim.received = '1999';
+  const failed = await html(back(b.o.id, (await sessionOf(b.o.id)).s));
+  assert.match(failed.text, /<h1>No se pudo completar el pago<\/h1>/);
+  assert.match(failed.text, /data-status="failed"/);
+
+  const paid = renderPaymentResult({ status: 'processing', orderId: 5 });
+  assert.match(paid, /<h1>Estamos confirmando tu pago<\/h1>/);
+});
+
+test('vuelta en navegador: los errores también son una página, con el mismo código HTTP', async () => {
+  const a = await setup();
+  await pay(a.buyer, a.o.id);
+  const bad = await html(back(a.o.id, (await sessionOf(a.o.id)).s, 'ref-1', 'AAAA'));
+  assert.equal(bad.status, 400);
+  assert.match(bad.text, /<h1>No pudimos verificar el pago<\/h1>/);
+  assert.match(bad.text, /data-seconds="6"/, 'errors stay a bit longer so they can be read');
+  assert.doesNotMatch(bad.text, /INVALID_INTERACTION_HASH|continue_token/, 'no internal details on the page');
+  assert.deepEqual(sim.calls, []);
+
+  const missing = await html(request(app).get(retornoUrl(999999999)));
+  assert.equal(missing.status, 404);
+  assert.match(missing.text, /<h1>No encontramos el pedido<\/h1>/);
+
+  const b = await setup();
+  sim.quoteExpiresAt = new Date(Date.now() - 1000).toISOString();
+  await pay(b.buyer, b.o.id);
+  const late = await html(back(b.o.id, (await sessionOf(b.o.id)).s));
+  assert.equal(late.status, 409);
+  assert.match(late.text, /<h1>La cotización venció<\/h1>/);
+});
+
+test('vuelta en navegador: con FRONTEND_URL ofrece volver a la app, con el resultado, y avisa solo a ese origen', async () => {
+  const before = config.frontendUrl;
+  config.frontendUrl = 'https://app.lokora.test/payment/result';
+  try {
+    const { buyer, o } = await setup();
+    await pay(buyer, o.id);
+    const res = await html(back(o.id, (await sessionOf(o.id)).s));
+    assert.equal(res.status, 200, 'a browser gets the page, not a redirect');
+    assert.match(res.text, /data-app-origin="https:\/\/app\.lokora\.test"/);
+    assert.match(res.text, new RegExp(`href="https://app\\.lokora\\.test/payment/result\\?payment=paid&amp;order=${o.id}"`));
+    assert.match(res.text, />Volver a la app</);
+  } finally {
+    config.frontendUrl = before;
+  }
+});
+
+test('vuelta para clientes de API: sin pedir HTML se mantiene el JSON y la redirección de antes', async () => {
+  const before = config.frontendUrl;
+  try {
+    const a = await setup();
+    await pay(a.buyer, a.o.id);
+    config.frontendUrl = undefined;
+    const json = await request(app).get(retornoUrl(a.o.id)).set('Accept', 'application/json').query({ result: 'grant_rejected' });
+    assert.equal(json.status, 200);
+    assert.deepEqual(json.body, { status: 'denied', orderId: a.o.id });
+
+    config.frontendUrl = 'https://app.lokora.test/result';
+    const redirect = await request(app).get(retornoUrl(a.o.id)).set('Accept', 'application/json').query({ result: 'grant_rejected' });
+    assert.equal(redirect.status, 302);
+    assert.equal(redirect.headers.location, `https://app.lokora.test/result?payment=denied&order=${a.o.id}`);
+    const err = await request(app).get(retornoUrl(999999999)).set('Accept', 'application/json');
+    assert.equal(err.body.error.code, 'ORDER_NOT_FOUND');
+  } finally {
+    config.frontendUrl = before;
+  }
+});
+
+test('la página de resultado escapa todo lo que muestra', () => {
+  const page = renderPaymentResult({ status: 'paid', orderId: 1, orderNumber: '"><script>alert(1)</script>', appUrl: 'https://x.test/?a="><b>', appOrigin: 'https://x.test' });
+  assert.doesNotMatch(page, /<script>alert/);
+  assert.doesNotMatch(page, /href="https:\/\/x\.test\/\?a="><b>/);
+  assert.match(page, /&lt;script&gt;alert\(1\)&lt;\/script&gt;/);
 });
