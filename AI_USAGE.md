@@ -21,8 +21,6 @@ No tenemos a mano el consumo de créditos de esas sesiones. Si el plan es de pag
 
 ### 2. API REST (`api/`), con Claude Code
 
-Solo cubre lo que se pidió en esta sesión de trabajo. El resto de `api/` (marketplace, autenticación, pagos) lo escribió el equipo y no está en esta lista.
-
 **Código y pruebas**
 - `GET /stores`: listado público de tiendas activas con filtros `q` y `city` y paginación por cursor, con su prueba.
 - Imágenes de tienda: banner (1600×600) e icono circular (256×256) con `PUT` y `DELETE` en `/seller/store/banner` y `/seller/store/icon`, y los campos `bannerUrl` e `iconUrl` en las respuestas de tienda. Migración `0010`.
