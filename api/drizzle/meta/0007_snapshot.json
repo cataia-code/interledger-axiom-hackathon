@@ -1,5 +1,5 @@
 {
-  "id": "335397dc-c7c2-453b-8c85-3d41c8cee4d9",
+  "id": "cb951127-7aff-45d1-a881-ad6855e79d20",
   "prevId": "a0784001-a904-4644-ae1a-c879a8b41af3",
   "version": "7",
   "dialect": "postgresql",
@@ -624,18 +624,6 @@
           "type": "char(3)",
           "primaryKey": false,
           "notNull": true
-        },
-        "banner_path": {
-          "name": "banner_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "icon_path": {
-          "name": "icon_path",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
         },
         "status": {
           "name": "status",
@@ -2467,6 +2455,303 @@
           "value": "\"refund\".\"amount\" > 0"
         }
       },
+      "isRLSEnabled": false
+    },
+    "public.payment_session": {
+      "name": "payment_session",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "payment_session_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "payment_id": {
+          "name": "payment_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "nonce": {
+          "name": "nonce",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "finish_nonce": {
+          "name": "finish_nonce",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "redirect_url": {
+          "name": "redirect_url",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "continue_uri": {
+          "name": "continue_uri",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "continue_token": {
+          "name": "continue_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quote_id": {
+          "name": "quote_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "quote_expires_at": {
+          "name": "quote_expires_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "incoming_payment_id": {
+          "name": "incoming_payment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "incoming_token": {
+          "name": "incoming_token",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buyer_wallet": {
+          "name": "buyer_wallet",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "seller_wallet": {
+          "name": "seller_wallet",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buyer_auth_server": {
+          "name": "buyer_auth_server",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "buyer_resource_server": {
+          "name": "buyer_resource_server",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "receive_value": {
+          "name": "receive_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "receive_asset_code": {
+          "name": "receive_asset_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "receive_asset_scale": {
+          "name": "receive_asset_scale",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "debit_value": {
+          "name": "debit_value",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "debit_asset_code": {
+          "name": "debit_asset_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "debit_asset_scale": {
+          "name": "debit_asset_scale",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "outgoing_payment_id": {
+          "name": "outgoing_payment_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "payment_session_payment_idx": {
+          "name": "payment_session_payment_idx",
+          "columns": [
+            {
+              "expression": "payment_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "payment_session_payment_id_payment_id_fk": {
+          "name": "payment_session_payment_id_payment_id_fk",
+          "tableFrom": "payment_session",
+          "tableTo": "payment",
+          "columnsFrom": [
+            "payment_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.user_wallet": {
+      "name": "user_wallet",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigint",
+          "primaryKey": true,
+          "notNull": true,
+          "identity": {
+            "type": "byDefault",
+            "name": "user_wallet_id_seq",
+            "schema": "public",
+            "increment": "1",
+            "startWith": "1",
+            "minValue": "1",
+            "maxValue": "9223372036854775807",
+            "cache": "1",
+            "cycle": false
+          }
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "address": {
+          "name": "address",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_code": {
+          "name": "asset_code",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "asset_scale": {
+          "name": "asset_scale",
+          "type": "smallint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "user_wallet_user_id_user_id_fk": {
+          "name": "user_wallet_user_id_user_id_fk",
+          "tableFrom": "user_wallet",
+          "tableTo": "user",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "user_wallet_user_id_unique": {
+          "name": "user_wallet_user_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "user_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
       "isRLSEnabled": false
     }
   },

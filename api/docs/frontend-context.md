@@ -130,6 +130,8 @@ Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 | POST | `/orders/:id/cancel` | Cancela (pendiente o pagado), libera/devuelve stock y reembolsa |
 | POST | `/orders/:id/pay` | Header `Idempotency-Key`. 201/200. 409 `ORDER_NOT_PAYABLE` |
 | GET | `/orders/:id/payments` | `{payments:[Payment]}` con reembolsos |
+| GET/POST | `/me/wallets` | Lista / vincula wallets de Open Payments: `POST {address, name?, primary?}` (URL o `$host/ruta`; `name` es el apodo que el usuario le pone, máx. 60; la primera queda como principal; máx. 10) |
+| PATCH/DELETE | `/me/wallets/:id` | `PATCH {name?, primary?: true}` renombra o cambia la principal. Al borrar la principal, la más antigua pasa a serlo |
 
 ```ts
 Cart = { id, storeId, currency, lines: [{ itemId, name, sku, quantity,
@@ -150,7 +152,7 @@ Payment = { id, orderId, provider, providerRef, status, amount, currency, create
 
 1. `GET /stores` → elegir tienda → `GET /items?storeId=X` (o `GET /items` para búsqueda global) → `PUT /cart/items/:id` (varias veces) → `GET /cart`.
 2. `POST /orders` (con `Idempotency-Key`): congela precios y **reserva el stock 15 min** (`expiresAt`).
-3. `POST /orders/:id/pay` (con otra `Idempotency-Key`). El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
+3. `POST /orders/:id/pay` (con otra `Idempotency-Key`; con Open Payments puedes mandar `{walletId}` para pagar con otra wallet del comprador, si no usa la principal). Con `PAYMENT_PROVIDER=openpayments` la respuesta trae `checkout` (`receive`, `debit`, `fee`, `expiresAt`, `redirectUrl`): muéstralo, deja que el comprador acepte y abre `redirectUrl` completa (no la cortes en el `&`). La wallet vuelve al backend, que redirige a `FRONTEND_URL?payment=paid|failed|denied&order=ID`; confirma con `GET /orders/:id`. Si `expiresAt` pasó, repite `POST /pay` y se cotiza de nuevo. Lo siguiente describe el modo placeholder. El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
 4. Si no se paga en 15 min el pedido se cancela solo y se libera el stock.
 
 ### Estados del pedido

@@ -1,0 +1,311 @@
+<title>Integración Open Payments</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: una columna de lectura con diagramas anchos; el diagrama de flujo es la pieza central. */
+:root {
+  --bg: #f6f7f5;
+  --surface: #ffffff;
+  --fg: #16201c;
+  --muted: #5b6862;
+  --line: #d9dfdb;
+  --accent: #0b6e5c;
+  --accent-soft: #dff1ec;
+  --warn: #a35a00;
+  --warn-soft: #fbeedb;
+  --ok-soft: #e1f3e8;
+  --del: #b3261e;
+  --del-soft: #fbe4e1;
+  --ok: #1f7a43;
+  --font-display: 'Fraunces', Georgia, serif;
+  --font-body: 'IBM Plex Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #101713; --surface: #172019; --fg: #e6ede9; --muted: #9aa8a1; --line: #2a362f;
+    --accent: #4fd1b3; --accent-soft: #163229; --warn: #f0b35c; --warn-soft: #33260f; --ok: #5fd08a; --ok-soft: #14301f; --del: #f08b82; --del-soft: #3a1b18;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #101713; --surface: #172019; --fg: #e6ede9; --muted: #9aa8a1; --line: #2a362f;
+  --accent: #4fd1b3; --accent-soft: #163229; --warn: #f0b35c; --warn-soft: #33260f; --ok: #5fd08a; --ok-soft: #14301f; --del: #f08b82; --del-soft: #3a1b18;
+  color-scheme: dark;
+}
+body {
+  background: var(--bg); color: var(--fg); font: 16px/1.6 var(--font-body);
+  padding-block: 40px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+main { max-width: 920px; margin: 0 auto; display: flex; flex-direction: column; gap: 48px; }
+h1, h2 { font-family: var(--font-display); font-weight: 600; text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+h1 { font-size: clamp(2rem, 5vw, 2.9rem); line-height: 1.1; }
+h2 { font-size: 1.55rem; line-height: 1.2; }
+h3 { font-size: 1rem; margin: 0 0 4px; }
+p { margin: 0; max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: 0.86em; }
+code { background: var(--accent-soft); padding: 1px 6px; border-radius: 4px; overflow-wrap: anywhere; }
+.eyebrow { font: 500 0.75rem/1 var(--font-mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+header { display: flex; flex-direction: column; gap: 14px; }
+header p { color: var(--muted); font-size: 1.05rem; }
+.meta { display: flex; flex-wrap: wrap; gap: 8px; }
+.pill { font: 500 0.78rem/1 var(--font-mono); padding: 6px 10px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); }
+section { display: flex; flex-direction: column; gap: 16px; }
+.stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; display: flex; flex-direction: column; gap: 2px; }
+.stat b { font: 600 2rem/1.1 var(--font-display); font-variant-numeric: tabular-nums; color: var(--accent); }
+.stat span { color: var(--muted); font-size: 0.88rem; }
+.diagram { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; overflow-x: auto; }
+.diagram pre.mermaid { margin: 0; min-width: 640px; }
+.scroll { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 0.92rem; min-width: 560px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+th { font: 500 0.74rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
+.cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 16px; min-width: 0; }
+.card p { color: var(--muted); font-size: 0.93rem; }
+.note { background: var(--warn-soft); border: 1px solid var(--warn); border-radius: 8px; padding: 14px 16px; }
+.note b { color: var(--warn); }
+.ok { color: var(--ok); font-weight: 600; }
+/* Marcas de revisión: lo que cambió respecto a la versión anterior del documento */
+.tag { display: inline-block; font: 600 0.68rem/1 var(--font-mono); letter-spacing: 0.08em; padding: 4px 7px; border-radius: 4px; margin-right: 8px; vertical-align: 1px; white-space: nowrap; }
+.tag.new { background: var(--ok); color: var(--bg); }
+.tag.mod { background: var(--warn); color: var(--bg); }
+.tag.del { background: var(--del); color: var(--bg); }
+tr.new td { background: var(--ok-soft); }
+tr.mod td { background: var(--warn-soft); }
+tr.del td { background: var(--del-soft); }
+tr.del td code, tr.del td.mono { text-decoration: line-through; }
+.card.new { border-color: var(--ok); background: var(--ok-soft); }
+.card.mod { border-color: var(--warn); background: var(--warn-soft); }
+.changes { border: 2px solid var(--accent); border-radius: 8px; padding: 20px; display: flex; flex-direction: column; gap: 14px; background: var(--surface); }
+.changes ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 10px; }
+.changes li { display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.versions { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.ver { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; font-size: 0.88rem; color: var(--muted); background: var(--surface); }
+.ver.now { border-color: var(--accent); color: var(--fg); }
+.ver b { display: block; font: 600 0.78rem/1 var(--font-mono); margin-bottom: 6px; color: var(--accent); }
+.before-after { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.before-after .card h3 { font: 600 0.74rem/1 var(--font-mono); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 10px; }
+svg text { fill: var(--fg); font-family: var(--font-body); }
+svg .muted { fill: var(--muted); }
+</style>
+
+<main>
+<header>
+  <span class="eyebrow">Rama feature/init_openpayment</span>
+  <h1>Cobro con Open Payments en el checkout</h1>
+  <p>El backend ahora cobra un pedido contra la red de pruebas de Interledger: cotiza, pide el consentimiento del comprador en su wallet y marca el pedido como pagado solo cuando el dinero llegó. Todo con dinero de juego.</p>
+  <div class="meta">
+    <span class="pill">Express 5 · Drizzle · PostgreSQL</span>
+    <span class="pill">@interledger/open-payments ^7.4</span>
+    <span class="pill">93 / 93 tests</span>
+    <span class="pill">Versión 3 del documento</span><span class="pill">Sin commit todavía</span>
+  </div>
+</header>
+
+<section>
+  <div class="changes">
+    <h2>Qué cambió en esta versión</h2>
+    <p>Un usuario ahora puede tener varias wallets, cada una con el nombre que él le pone, y una sola es la principal. En el documento, lo modificado lleva estas marcas:</p>
+    <div class="legend"><span><span class="tag new">NUEVO</span>agregado</span><span><span class="tag mod">CAMBIADO</span>distinto a la versión anterior</span><span><span class="tag del">ELIMINADO</span>ya no existe</span></div>
+    <ul>
+      <li><span class="tag mod">CAMBIADO</span><span>Tabla <code>user_wallet</code>: ya no es una por usuario. Pierde el índice único por usuario y gana <code>is_primary</code> y un índice que permite una sola principal.</span></li>
+      <li><span class="tag new">NUEVO</span><span>Varias wallets con nombre propio (<code>name</code>, hasta 60 caracteres). Máximo 10 por usuario.</span></li>
+      <li><span class="tag new">NUEVO</span><span>Wallet principal: la primera que vinculas lo es. Puedes cambiarla, y si borras la principal, la más antigua pasa a serlo.</span></li>
+      <li><span class="tag mod">CAMBIADO</span><span><code>/me/wallet</code> pasa a <code>/me/wallets</code> y <code>/me/wallets/:id</code>. Eliminados <code>PUT</code> y el <code>GET</code> singular.</span></li>
+      <li><span class="tag new">NUEVO</span><span><code>POST /orders/:id/pay</code> acepta <code>walletId</code> para pagar con otra wallet del comprador. Sin él usa la principal. La respuesta trae <code>checkout.buyerWallet</code>.</span></li>
+      <li><span class="tag new">NUEVO</span><span>Errores <code>WALLET_ALREADY_LINKED</code>, <code>WALLET_LIMIT</code>, <code>INVALID_PRIMARY</code> e <code>INVALID_WALLET_NAME</code>.</span></li>
+    </ul>
+    <div class="versions">
+      <div class="ver"><b>v1</b>Flujo de cobro, una wallet por usuario.</div>
+      <div class="ver"><b>v2</b>Nombre opcional en la wallet y <code>PATCH /me/wallet</code>.</div>
+      <div class="ver now"><b>v3 · esta</b>Varias wallets por usuario, principal y elección al pagar.</div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="stats">
+    <div class="stat"><b>6</b><span>endpoints nuevos</span></div>
+    <div class="stat"><b>2</b><span>tablas nuevas</span></div>
+    <div class="stat"><b>10</b><span>tests nuevos</span></div>
+    <div class="stat"><b>1</b><span>dependencia nueva</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Cómo viaja un pago</h2>
+  <p>Son dos momentos. El comprador pide pagar y recibe la cotización. Después de aprobar en su wallet, el navegador vuelve al backend y ahí se cierra el cobro.</p>
+  <div class="diagram">
+<pre class="mermaid">
+sequenceDiagram
+    autonumber
+    participant F as Front
+    participant A as API (Axiom)
+    participant S as Wallet de la tienda
+    participant B as Wallet del comprador
+    F->>A: POST /orders/:id/pay con walletId opcional (NUEVO)
+    Note over A: Toma la wallet elegida o la principal del comprador (CAMBIADO)
+    A->>S: Incoming payment por el total del pedido
+    A->>B: Quote (cuánto sale de la wallet)
+    A->>B: Grant outgoing-payment con redirect
+    A-->>F: checkout: llega, sale, comisión, vence, redirectUrl, buyerWallet (NUEVO)
+    F->>B: Abre redirectUrl y el comprador aprueba
+    B-->>A: GET /payments/openpayments/return/:orderId
+    Note over A: Verifica el hash. Si no coincide, se detiene
+    A->>B: Continúa el grant y crea el outgoing payment
+    A->>B: Consulta hasta que salió todo el monto
+    A->>S: Confirma que llegó lo cotizado
+    A-->>F: Redirige a FRONTEND_URL con payment=paid
+</pre>
+  </div>
+</section>
+
+<section>
+  <h2>Qué decide que un pedido quede pagado</h2>
+  <div class="cols">
+    <div class="card"><h3>Pagado</h3><p>El hash es válido, el outgoing payment terminó sin fallo y lo recibido es al menos lo cotizado. El pedido pasa a <code>paid</code> y las reservas de stock se convierten en venta.</p></div>
+    <div class="card"><h3>No pagado</h3><p>Consentimiento negado, hash inválido, monto incompleto o pago fallido. El pedido sigue en <code>pending_payment</code> y el comprador puede reintentar.</p></div>
+    <div class="card"><h3>Cotización vencida</h3><p>La cotización dura unos cinco minutos. Si venció, la vuelta se rechaza con <code>QUOTE_EXPIRED</code> y pagar de nuevo pide una cotización nueva. Nunca se reutiliza.</p></div>
+  </div>
+  <div class="diagram">
+<pre class="mermaid">
+stateDiagram-v2
+    [*] --> pending: POST /pay
+    pending --> pending: cotización vencida, se pide otra (superseded)
+    pending --> processing: vuelta con hash válido
+    processing --> completed: llegó el monto cotizado
+    processing --> failed: pago fallido o monto incompleto
+    failed --> pending: el comprador reintenta
+    completed --> [*]
+</pre>
+  </div>
+  <p class="mono" style="color:var(--muted)">Estados de payment_session. El pedido solo cambia a paid desde completed.</p>
+</section>
+
+<section>
+  <h2>Datos nuevos</h2>
+  <div class="diagram">
+<pre class="mermaid">
+erDiagram
+    USER ||--o{ USER_WALLET : "vincula varias (CAMBIADO)"
+    ORDER ||--o{ PAYMENT : tiene
+    PAYMENT ||--o{ PAYMENT_SESSION : "una por cotización"
+    USER_WALLET {
+        bigint id
+        int user_id "ya no es único (CAMBIADO)"
+        text name "NUEVO: lo define el usuario"
+        text address "único por usuario (NUEVO)"
+        text asset_code
+        smallint asset_scale
+        boolean is_primary "NUEVO: una sola por usuario"
+    }
+    PAYMENT_SESSION {
+        bigint payment_id
+        text status
+        text nonce
+        text finish_nonce
+        text quote_id
+        timestamp quote_expires_at
+        text debit_value
+        text receive_value
+        text continue_token "secreto, no sale por la API"
+    }
+</pre>
+  </div>
+  <div class="before-after">
+    <div class="card"><h3>Antes (v2)</h3><p>Una fila por usuario. <code>user_id</code> único. Nombre opcional. Sin noción de principal.</p></div>
+    <div class="card new"><h3>Ahora (v3)</h3><p>Hasta 10 filas por usuario. Único el par <code>(user_id, address)</code>. Nombre propio en cada una. <code>is_primary</code> con índice parcial: una sola principal por usuario.</p></div>
+  </div>
+  <p><span class="tag mod">CAMBIADO</span><code>user_wallet</code> guarda la URL de la wallet con su moneda y escala. <code>payment_session</code> guarda lo que hace falta entre el checkout y la vuelta del navegador. Migraciones <code>0007_openpayments</code>, <code>0008_wallet_name</code> y <code>0009_multiple_wallets</code> (esta última marca como principal las wallets que ya existieran).</p>
+</section>
+
+<section>
+  <h2>Endpoints</h2>
+  <div class="scroll"><table>
+    <tr><th>Método</th><th>Ruta</th><th>Qué hace</th></tr>
+        <tr class="del"><td class="mono"><span class="tag del">ELIMINADO</span>GET</td><td><code>/me/wallet</code></td><td>Wallet única del usuario.</td></tr>
+    <tr class="del"><td class="mono"><span class="tag del">ELIMINADO</span>PUT</td><td><code>/me/wallet</code></td><td>Vincular o reemplazar la wallet única.</td></tr>
+    <tr class="del"><td class="mono"><span class="tag del">ELIMINADO</span>PATCH</td><td><code>/me/wallet</code></td><td>Renombrar la wallet única.</td></tr>
+    <tr class="del"><td class="mono"><span class="tag del">ELIMINADO</span>DELETE</td><td><code>/me/wallet</code></td><td>Desvincular la wallet única.</td></tr>
+    <tr class="new"><td class="mono"><span class="tag new">NUEVO</span>GET</td><td><code>/me/wallets</code></td><td>Lista las wallets del usuario con <code>id</code>, <code>name</code>, <code>address</code>, moneda, escala e <code>isPrimary</code>.</td></tr>
+    <tr class="new"><td class="mono"><span class="tag new">NUEVO</span>POST</td><td><code>/me/wallets</code></td><td>Vincula otra wallet: <code>address</code>, <code>name</code> opcional (hasta 60) y <code>primary</code> opcional. Acepta URL o <code>$host/ruta</code>. La primera queda como principal. Responde 201.</td></tr>
+    <tr class="new"><td class="mono"><span class="tag new">NUEVO</span>PATCH</td><td><code>/me/wallets/:id</code></td><td>Cambia el nombre (<code>null</code> lo borra) y/o la hace principal con <code>primary: true</code>. Una wallet ajena responde 404.</td></tr>
+    <tr class="new"><td class="mono"><span class="tag new">NUEVO</span>DELETE</td><td><code>/me/wallets/:id</code></td><td>Desvincula. Si era la principal, la más antigua que quede pasa a serlo. Responde 204.</td></tr>
+<tr class="mod"><td class="mono"><span class="tag mod">CAMBIADO</span>POST</td><td><code>/orders/:id/pay</code></td><td>Con Open Payments añade el bloque <code>checkout</code> y es idempotente. Ahora acepta <code>{"walletId"}</code> para pagar con otra wallet propia; sin él, la principal. Elegir otra wallet pide una cotización nueva.</td></tr>
+    <tr><td class="mono">GET</td><td><code>/payments/openpayments/return/:orderId</code></td><td>Vuelta desde la wallet. Verifica el hash, cobra y redirige al front.</td></tr>
+  </table></div>
+  <div class="scroll"><table>
+    <tr><th>Código</th><th>Cuándo</th></tr>
+    <tr><td><code>BUYER_WALLET_REQUIRED</code> · 409</td><td>El comprador no tiene ninguna wallet vinculada.</td></tr>
+    <tr><td><code>SELLER_WALLET_REQUIRED</code> · 409</td><td>El dueño de la tienda no tiene wallet principal.</td></tr>
+    <tr><td><code>CURRENCY_MISMATCH</code> · 409</td><td>La wallet de la tienda cobra en otra moneda que el pedido.</td></tr>
+    <tr><td><code>INVALID_INTERACTION_HASH</code> · 400</td><td>El hash de vuelta no coincide. No se crea ningún pago.</td></tr>
+    <tr><td><code>QUOTE_EXPIRED</code> · 409</td><td>La cotización venció antes de la aprobación.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span><code>WALLET_ALREADY_LINKED</code> · 409</td><td>Esa wallet ya está vinculada a tu cuenta.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span><code>WALLET_LIMIT</code> · 409</td><td>Ya tienes 10 wallets vinculadas.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span><code>INVALID_PRIMARY</code> · 400</td><td><code>primary</code> solo acepta <code>true</code>; para quitarla, haz principal a otra.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span><code>INVALID_WALLET_NAME</code> · 400</td><td>El nombre pasa de 60 caracteres.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span><code>WALLET_NOT_FOUND</code> · 404</td><td>La wallet no existe o es de otro usuario (también en <code>walletId</code> al pagar).</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Pruebas</h2>
+  <p>La suite corre con un cliente simulado de Open Payments, así que no depende de internet ni de wallets reales.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 720 150" width="100%" role="img" aria-label="Barra de 93 pruebas: 83 anteriores y 10 nuevas, todas pasan">
+      <text x="0" y="18" font-size="13" class="muted">Pruebas automáticas (node --test)</text>
+      <rect x="0" y="32" width="642" height="34" rx="4" fill="#0b6e5c" opacity="0.35"/>
+      <rect x="642" y="32" width="78" height="34" rx="4" fill="#0b6e5c"/>
+      <text x="12" y="54" font-size="14" font-weight="600">83 anteriores</text>
+      <text x="650" y="54" font-size="13" font-weight="600" style="fill:#ffffff">10 nuevas</text>
+      <line x1="0" y1="82" x2="720" y2="82" stroke="currentColor" opacity="0.2"/>
+      <text x="0" y="104" font-size="13" class="muted">0</text>
+      <text x="340" y="104" font-size="13" class="muted">45</text>
+      <text x="694" y="104" font-size="13" class="muted">93</text>
+      <text x="0" y="136" font-size="14" font-weight="600">93 de 93 pasan · lint sin avisos</text>
+    </svg>
+  </div>
+  <div class="scroll"><table>
+    <tr><th>Escenario nuevo</th><th>Resultado comprobado</th></tr>
+    <tr class="mod"><td><span class="tag mod">CAMBIADO</span>Vincular wallets</td><td>Rechaza URL mal formada, <code>http</code> y wallets que no existen; acepta <code>$host/ruta</code>; guarda varias con nombre; la primera es principal; cambiar la principal deja solo una; borrar la principal asciende a otra; una wallet ajena da 404.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span>Elegir wallet al pagar</td><td>Sin <code>walletId</code> usa la principal; con otra wallet pide cotización nueva; una wallet ajena da 404.</td></tr>
+    <tr class="new"><td><span class="tag new">NUEVO</span>Límite de wallets</td><td>La wallet número 11 responde <code>WALLET_LIMIT</code>.</td></tr>
+    <tr><td>Faltan wallets o moneda distinta (ahora mide la principal)</td><td>El pedido no se puede pagar y devuelve el código claro.</td></tr>
+    <tr><td>Checkout</td><td>Llega 2000, sale 2100, comisión 100; la URL llega entera; el token de continuación no aparece; repetir no duplica.</td></tr>
+    <tr><td>Vuelta con hash válido</td><td>Pedido <code>paid</code>, pago <code>captured</code>; un segundo callback no cobra otra vez.</td></tr>
+    <tr><td>Hash inválido o consentimiento negado</td><td>No se continúa el grant; el pedido sigue pendiente.</td></tr>
+    <tr><td>Monto incompleto o pago fallido</td><td>El pedido no se marca pagado y el comprador puede reintentar.</td></tr>
+    <tr><td>Cotización vencida</td><td>La vuelta se rechaza; pagar de nuevo crea cotización nueva y deja la anterior como <code>superseded</code>.</td></tr>
+    <tr><td>Webhook del placeholder</td><td>Responde 404 cuando el proveedor activo es Open Payments.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Configuración</h2>
+  <div class="scroll"><table>
+    <tr><th>Variable</th><th>Para qué</th></tr>
+    <tr><td><code>PAYMENT_PROVIDER</code></td><td><code>placeholder</code> (por defecto, simulado) o <code>openpayments</code>.</td></tr>
+    <tr><td><code>OP_CLIENT_WALLET_ADDRESS</code></td><td>Wallet de la app. Identifica al backend, no a un usuario.</td></tr>
+    <tr><td><code>OP_KEY_ID</code></td><td>Key ID de Developer Keys.</td></tr>
+    <tr><td><code>OP_PRIVATE_KEY</code> / <code>OP_PRIVATE_KEY_PATH</code></td><td>Contenido o ruta de <code>private.key</code>. No se sube al repo.</td></tr>
+    <tr><td><code>PUBLIC_API_URL</code></td><td>URL pública de la API, a donde vuelve la wallet.</td></tr>
+    <tr><td><code>FRONTEND_URL</code></td><td>Opcional. Si falta, la vuelta responde JSON en vez de redirigir.</td></tr>
+  </table></div>
+</section>
+
+<section>
+  <h2>Qué falta</h2>
+  <div class="note"><b>Sin probar contra la red real.</b> Hacen falta las credenciales <code>OP_*</code> y dos wallets de wallet.interledger-test.dev, una de comprador y otra de vendedor. Hasta entonces, lo comprobado es la lógica del backend con un cliente simulado.</div>
+  <div class="cols">
+    <div class="card"><h3>Front</h3><p><span class="tag mod">CAMBIADO</span>Debe permitir gestionar varias wallets con nombre y elegir con cuál pagar. Debe mostrar la cotización antes de redirigir y leer <code>?payment=paid|failed|denied&amp;order=ID</code> al volver.</p></div>
+    <div class="card"><h3>Reembolsos</h3><p>Quedan fuera, como indica el documento. Con este proveedor un reembolso solo se registra y no mueve dinero.</p></div>
+    <div class="card"><h3>Despliegue</h3><p>Cargar las variables <code>OP_*</code> en Railway y publicar la llave pública en <code>{wallet}/jwks.json</code>.</p></div>
+  </div>
+</section>
+</main>
