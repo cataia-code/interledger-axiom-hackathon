@@ -250,7 +250,7 @@ test('GET /stores lists only active stores, with filters and cursor pagination',
   assert.equal(res.status, 200);
   assert.deepEqual(res.body.stores.map((s) => s.id), [a.store.id]);
   assert.equal(res.body.nextCursor, null);
-  assert.deepEqual(Object.keys(res.body.stores[0]).sort(), ['address', 'bannerUrl', 'city', 'currency', 'description', 'iconUrl', 'id', 'latitude', 'longitude', 'name', 'status']);
+  assert.deepEqual(Object.keys(res.body.stores[0]).sort(), ['address', 'bannerUrl', 'city', 'currency', 'description', 'iconUrl', 'id', 'latitude', 'level', 'longitude', 'name', 'score', 'stars', 'status']);
   assert.equal(res.body.stores[0].status, 'active');
 
   // Filtro por ciudad y escape de comodines.

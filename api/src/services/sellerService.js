@@ -4,6 +4,7 @@ import { user } from '../db/schema.js';
 import { organization, store } from '../db/business.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { bad, integer } from './validation.js';
+import { scoresFor } from './statsService.js';
 import { validateOrganizationPatch, validateStorePatch } from './storeService.js';
 
 // Drizzle envuelve el error de pg en `cause`.
@@ -94,28 +95,58 @@ export async function getPublicStore(id) {
 }
 
 // Listado público de sucursales activas, de la más nueva a la más antigua (cursor = id).
+const STORE_SORTS = ['newest', 'score'];
+
 export async function listPublicStores(query) {
   const limit = query.limit === undefined ? 20 : integer(query.limit, 'limit', 1, 50, 'INVALID_LIMIT');
-  const where = [eq(store.status, 'active'), isNull(store.deletedAt)];
-  if (query.cursor !== undefined) {
-    const cursor = Number(query.cursor);
-    if (!Number.isSafeInteger(cursor)) throw bad('cursor is not valid', 'INVALID_CURSOR');
-    where.push(lt(store.id, cursor));
-  }
+  const sort = query.sort ?? 'newest';
+  if (!STORE_SORTS.includes(sort)) throw bad(`sort must be one of ${STORE_SORTS.join(', ')}`, 'INVALID_SORT');
+  const filters = [eq(store.status, 'active'), isNull(store.deletedAt)];
   const escape = (v) => `%${v.replace(/[\\%_]/g, '\\$&')}%`;
   if (query.city !== undefined) {
     const city = String(query.city).trim();
     if (city.length > 80) throw bad('city must be at most 80 characters', 'INVALID_QUERY');
-    if (city) where.push(ilike(store.city, escape(city)));
+    if (city) filters.push(ilike(store.city, escape(city)));
   }
   if (query.q !== undefined) {
     const q = String(query.q).trim();
     if (q.length > 80) throw bad('q must be at most 80 characters', 'INVALID_QUERY');
-    if (q) where.push(or(ilike(store.name, escape(q)), ilike(store.description, escape(q))));
+    if (q) filters.push(or(ilike(store.name, escape(q)), ilike(store.description, escape(q))));
   }
-  const rows = await db.select().from(store).where(and(...where)).orderBy(desc(store.id)).limit(limit + 1);
+
+  // Por puntaje: se calcula el de todas las tiendas que cumplen el filtro y se pagina por (puntaje, id).
+  if (sort === 'score') {
+    let after = null;
+    if (query.cursor !== undefined) {
+      const m = /^(\d{1,3}):(\d{1,15})$/.exec(String(query.cursor));
+      if (!m) throw bad('cursor is not valid', 'INVALID_CURSOR');
+      after = { score: Number(m[1]), id: Number(m[2]) };
+    }
+    const rows = await db.select().from(store).where(and(...filters)).orderBy(desc(store.id));
+    const scores = await scoresFor(rows);
+    const ranked = rows
+      .map((row) => ({ row, ...scores.get(row.id) }))
+      .sort((a, b) => b.score - a.score || b.row.id - a.row.id)
+      .filter((r) => !after || r.score < after.score || (r.score === after.score && r.row.id < after.id));
+    const page = ranked.slice(0, limit);
+    return {
+      stores: page.map(({ row, score, stars, level }) => ({ ...presentPublicStore(row), score, stars, level })),
+      nextCursor: ranked.length > limit ? `${page.at(-1).score}:${page.at(-1).row.id}` : null,
+    };
+  }
+
+  if (query.cursor !== undefined) {
+    const cursor = Number(query.cursor);
+    if (!Number.isSafeInteger(cursor)) throw bad('cursor is not valid', 'INVALID_CURSOR');
+    filters.push(lt(store.id, cursor));
+  }
+  const rows = await db.select().from(store).where(and(...filters)).orderBy(desc(store.id)).limit(limit + 1);
   const page = rows.slice(0, limit);
-  return { stores: page.map(presentPublicStore), nextCursor: rows.length > limit ? String(page.at(-1).id) : null };
+  const scores = await scoresFor(page);
+  return {
+    stores: page.map((row) => ({ ...presentPublicStore(row), ...scores.get(row.id) })),
+    nextCursor: rows.length > limit ? String(page.at(-1).id) : null,
+  };
 }
 
 export const presentOrganization = (o) => ({

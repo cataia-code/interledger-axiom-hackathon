@@ -19,6 +19,9 @@ const GROUPS = {
   ],
   Catálogo: [
     ['GET', '/api/v1/stores'],
+    ['GET', '/api/v1/stores?sort=score'],
+    ['GET', '/api/v1/stores/:id/stats'],
+    ['GET', '/api/v1/stats'],
     ['GET', '/api/v1/items'],
     ['GET', '/api/v1/items?storeId=:id'],
     ['GET', '/api/v1/items/:id'],
@@ -43,6 +46,7 @@ const GROUPS = {
   ],
   'Vendedor (token)': [
     ['GET', '/api/v1/seller/organization'],
+    ['GET', '/api/v1/seller/stats'],
     ['GET', '/api/v1/seller/store'],
     ['DELETE', '/api/v1/seller/store/banner'],
     ['DELETE', '/api/v1/seller/store/icon'],
