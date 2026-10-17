@@ -27,12 +27,12 @@ cp .env.example .env
 
 `.env` y `private.key` no se suben al repo.
 
-## Scripts
+## Pago
 
 ```bash
 npm run pay -- --buyer https://ilp.interledger-test.dev/quien-paga --seller https://ilp.interledger-test.dev/quien-cobra --amount 10.00
 ```
 
-`--buyer` es la wallet de quien paga. `--seller` es la de quien recibe. `--amount` es lo que debe llegar al vendedor, en la moneda de su cuenta. Si lo omites, usa `1.00`.
+`--buyer` es quien paga. `--seller` es quien recibe. `--amount` es lo que debe llegar, en la moneda de su cuenta. Si lo omites, usa `1.00`.
 
-El script imprime una URL. Ábrela, inicia sesión con la cuenta que paga y aprueba. La wallet vuelve a `http://localhost:3344/callback` y el script termina solo. Con `assetScale` 2, `10.00` se envía a la API como `1000`.
+El script imprime una URL. Ábrela, inicia sesión con la cuenta que paga y aprueba. Esa aprobación es el único paso de la persona. La wallet vuelve a `http://localhost:3344/callback` y el script termina solo. Con `assetScale` 2, `10.00` se envía a la API como `1000`.

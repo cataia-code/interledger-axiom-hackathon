@@ -1,121 +1,33 @@
+// Flujo de referencia para POST /api/v1/orders/:id/pay.
+// El backend lo ejecuta dentro de un request: incoming payment, quote y grant.
+// La persona solo aprueba en interact.redirect. El pedido pasa a pagado
+// cuando sentAmount cubre debitAmount, el incoming recibió el monto y failed es false.
+// El detalle del contrato con api/ está en ../INTEGRACION.md.
+
 import { createHash, randomUUID } from 'node:crypto'
 import { spawn } from 'node:child_process'
 import { createServer, type Server } from 'node:http'
 import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+
+import { isPendingGrant, type AuthenticatedClient } from '@interledger/open-payments'
 
 import {
-  createAuthenticatedClient,
-  isFinalizedGrantWithAccessToken,
-  isPendingGrant,
-  OpenPaymentsClientError,
-  type AuthenticatedClient,
-  type Grant,
-  type PendingGrant
-} from '@interledger/open-payments'
-import 'dotenv/config'
-
-type Amount = {
-  value: string
-  assetCode: string
-  assetScale: number
-}
+  accessTokenOf,
+  arg,
+  describeSpread,
+  formatAmount,
+  openClient,
+  required,
+  resourceBase,
+  retryNetwork,
+  sleep,
+  toMinorUnits,
+  walletArg,
+  type Amount
+} from './lib.js'
 
 const CALLBACK_PATH = '/callback'
 const APPROVAL_TIMEOUT_MS = 10 * 60_000
-
-function required(name: string, fallback?: string): string {
-  const value = process.env[name]?.trim() || fallback?.trim()
-  if (!value) {
-    throw new Error(`Falta ${name} en .env. Copia .env.example y completa la llave del cliente.`)
-  }
-  return value
-}
-
-function arg(name: string): string | undefined {
-  const flag = `--${name}`
-  const index = process.argv.indexOf(flag)
-  const value = index === -1 ? undefined : process.argv[index + 1]
-  if (!value || value.startsWith('--')) return undefined
-  return value.trim()
-}
-
-function walletArg(name: string): string {
-  const value = arg(name)
-  if (!value || !/^https?:\/\//.test(value)) {
-    throw new Error(
-      `Falta --${name} con una wallet address. El comprador y el vendedor llegan en cada pago, no van en .env.`
-    )
-  }
-  return value
-}
-
-function resourceBase(url: string): string {
-  return url.replace(/\/+$/, '')
-}
-
-function toMinorUnits(amount: string, scale: number): string {
-  if (!/^\d+(\.\d+)?$/.test(amount)) {
-    throw new Error(`AMOUNT debe ser un decimal como 1.00. Recibido: ${amount}`)
-  }
-  const [whole, fraction = ''] = amount.split('.')
-  if (fraction.length > scale) {
-    throw new Error(
-      `AMOUNT tiene ${fraction.length} decimales y la moneda del receptor usa ${scale}.`
-    )
-  }
-  const minor =
-    BigInt(whole) * 10n ** BigInt(scale) + BigInt(fraction.padEnd(scale, '0') || '0')
-  return minor.toString()
-}
-
-function formatAmount(amount: Amount): string {
-  const digits = amount.value.padStart(amount.assetScale + 1, '0')
-  if (amount.assetScale === 0) return `${digits} ${amount.assetCode}`
-  const whole = digits.slice(0, -amount.assetScale)
-  const fraction = digits.slice(-amount.assetScale)
-  return `${whole}.${fraction} ${amount.assetCode}`
-}
-
-function majorUnits(amount: Amount): number {
-  const digits = amount.value.padStart(amount.assetScale + 1, '0')
-  if (amount.assetScale === 0) return Number(digits)
-  const whole = digits.slice(0, -amount.assetScale)
-  const fraction = digits.slice(-amount.assetScale)
-  return Number(`${whole}.${fraction}`)
-}
-
-function describeSpread(receive: Amount, debit: Amount): string {
-  if (receive.assetCode === debit.assetCode && receive.assetScale === debit.assetScale) {
-    const fee = BigInt(debit.value) - BigInt(receive.value)
-    const feeAmount: Amount = {
-      value: fee.toString(),
-      assetCode: debit.assetCode,
-      assetScale: debit.assetScale
-    }
-    const percent = (Number(fee) / Number(receive.value)) * 100
-    return `Comision: ${formatAmount(feeAmount)} (${percent.toFixed(2)}% de lo recibido)`
-  }
-  const rate = majorUnits(debit) / majorUnits(receive)
-  return `Cambio cotizado: ${rate.toFixed(4)} ${debit.assetCode} por cada 1 ${receive.assetCode}`
-}
-
-function accessTokenOf(grant: PendingGrant | Grant, label: string): string {
-  if (!isFinalizedGrantWithAccessToken(grant)) {
-    throw new Error(
-      `${label} no devolvio un access token listo para usar.\n${JSON.stringify(grant, null, 2)}`
-    )
-  }
-  return grant.access_token.value
-}
-
-function privateKeyMaterial(filePath: string): string {
-  const raw = readFileSync(filePath, 'utf8').trim()
-  if (raw.includes('BEGIN')) return filePath
-  const decoded = Buffer.from(raw, 'base64').toString('utf8')
-  if (decoded.includes('BEGIN')) return decoded
-  return filePath
-}
 
 function interactionHash(clientNonce: string, serverNonce: string, interactRef: string, grantUrl: string): string {
   return createHash('sha256')
@@ -187,64 +99,20 @@ function waitForApproval(port: number): Promise<{ interactRef: string; hash: str
   })
 }
 
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function isNetworkFailure(error: unknown): boolean {
-  if (!(error instanceof OpenPaymentsClientError) && !(error instanceof Error)) return false
-  const description = error instanceof OpenPaymentsClientError ? error.description : ''
-  const text = `${error.message} ${description}`.toLowerCase()
-  return (
-    text.includes('fetch failed') ||
-    text.includes('network') ||
-    text.includes('timed out') ||
-    text.includes('timeout') ||
-    text.includes('econnreset') ||
-    text.includes('socket')
-  )
-}
-
-async function retryNetwork<T>(label: string, action: () => Promise<T>): Promise<T> {
-  const attempts = 3
-  for (let attempt = 1; attempt <= attempts; attempt += 1) {
-    try {
-      return await action()
-    } catch (error) {
-      if (attempt === attempts || !isNetworkFailure(error)) throw error
-      console.log(
-        `\n${label}: la conexion con la red de pruebas se corto. Reintento ${attempt + 1} de ${attempts}.`
-      )
-      await sleep(1000 * attempt)
-    }
-  }
-  throw new Error(`${label}: se agotaron los reintentos.`)
-}
-
-async function main(): Promise<void> {
+export async function runPay(): Promise<void> {
   const senderWalletUrl = walletArg('buyer')
   const receiverWalletUrl = walletArg('seller')
-  const clientWalletUrl = required('CLIENT_WALLET_ADDRESS')
-  const keyId = required('KEY_ID')
-  const privateKeyPath = resolve(required('PRIVATE_KEY_PATH'))
   const amount = arg('amount') ?? '1.00'
   const port = Number(required('PORT', '3344'))
   const nonce = randomUUID()
   const finishUri = `http://localhost:${port}${CALLBACK_PATH}`
 
   if (senderWalletUrl === receiverWalletUrl) {
-    throw new Error('SENDER y RECEIVER tienen que ser dos wallet addresses distintas.')
+    throw new Error('El comprador y el vendedor tienen que ser dos wallet addresses distintas.')
   }
 
-  const openClient = (): Promise<AuthenticatedClient> =>
-    createAuthenticatedClient({
-      walletAddressUrl: clientWalletUrl,
-      privateKey: privateKeyMaterial(privateKeyPath),
-      keyId,
-      requestTimeoutMs: 20_000
-    })
-
-  let client = await openClient()
+  const open = (): Promise<AuthenticatedClient> => openClient()
+  let client = await open()
 
   const receiver = await client.walletAddress.get({ url: receiverWalletUrl })
   const sender = await client.walletAddress.get({ url: senderWalletUrl })
@@ -260,44 +128,43 @@ async function main(): Promise<void> {
     `Pedido: que lleguen ${formatAmount(incomingAmount)} (la API guarda ${incomingAmount.value}, porque scale ${receiver.assetScale} son los decimales).`
   )
 
-  const incomingGrantBody = {
-    access_token: {
-      access: [{ type: 'incoming-payment' as const, actions: ['create' as const, 'read' as const] }]
-    }
-  }
   const incomingGrant = await client.grant.request(
     { url: receiver.authServer },
-    incomingGrantBody
+    {
+      access_token: {
+        access: [{ type: 'incoming-payment', actions: ['create', 'read', 'complete'] }]
+      }
+    }
   )
   const incomingToken = accessTokenOf(incomingGrant, 'Grant de incoming payment')
 
-  const incomingBody = {
-    walletAddress: receiver.id,
-    incomingAmount,
-    expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
-    metadata: { description: 'Ejercicio Open Payments' }
-  }
   const incomingPayment = await client.incomingPayment.create(
     { url: resourceBase(receiver.resourceServer), accessToken: incomingToken },
-    incomingBody
+    {
+      walletAddress: receiver.id,
+      incomingAmount,
+      expiresAt: new Date(Date.now() + 30 * 60_000).toISOString(),
+      metadata: { description: 'Ejercicio Open Payments' }
+    }
   )
 
-  const quoteGrantBody = {
-    access_token: {
-      access: [{ type: 'quote' as const, actions: ['create' as const, 'read' as const] }]
+  const quoteGrant = await client.grant.request(
+    { url: sender.authServer },
+    {
+      access_token: {
+        access: [{ type: 'quote', actions: ['create', 'read'] }]
+      }
     }
-  }
-  const quoteGrant = await client.grant.request({ url: sender.authServer }, quoteGrantBody)
+  )
   const quoteToken = accessTokenOf(quoteGrant, 'Grant de quote')
 
-  const quoteBody = {
-    walletAddress: sender.id,
-    receiver: incomingPayment.id,
-    method: 'ilp' as const
-  }
   const quote = await client.quote.create(
     { url: resourceBase(sender.resourceServer), accessToken: quoteToken },
-    quoteBody
+    {
+      walletAddress: sender.id,
+      receiver: incomingPayment.id,
+      method: 'ilp'
+    }
   )
   console.log('\nCotizacion')
   console.log('  Llega: ', formatAmount(quote.receiveAmount))
@@ -306,25 +173,24 @@ async function main(): Promise<void> {
   if (quote.expiresAt) console.log('  Vence: ', quote.expiresAt)
 
   const approval = waitForApproval(port)
-  const outgoingGrantBody = {
-    access_token: {
-      access: [
-        {
-          type: 'outgoing-payment' as const,
-          actions: ['create' as const, 'read' as const],
-          identifier: sender.id,
-          limits: { debitAmount: quote.debitAmount }
-        }
-      ]
-    },
-    interact: {
-      start: ['redirect' as const],
-      finish: { method: 'redirect' as const, uri: finishUri, nonce }
-    }
-  }
   const outgoingGrant = await client.grant.request(
     { url: sender.authServer },
-    outgoingGrantBody
+    {
+      access_token: {
+        access: [
+          {
+            type: 'outgoing-payment',
+            actions: ['create', 'read'],
+            identifier: sender.id,
+            limits: { debitAmount: quote.debitAmount }
+          }
+        ]
+      },
+      interact: {
+        start: ['redirect'],
+        finish: { method: 'redirect', uri: finishUri, nonce }
+      }
+    }
   )
   if (!isPendingGrant(outgoingGrant)) {
     throw new Error('El grant de outgoing payment deberia quedar pendiente de interaccion.')
@@ -341,14 +207,17 @@ async function main(): Promise<void> {
     callback.interactRef,
     sender.authServer
   )
-  const hashOk = hashesMatch(expectedHash, callback.hash)
-  if (!hashOk) {
-    throw new Error('El hash de la redireccion no coincide. No se continua el grant.')
+  if (!hashesMatch(expectedHash, callback.hash)) {
+    await client.incomingPayment.complete({
+      url: incomingPayment.id,
+      accessToken: incomingToken
+    })
+    throw new Error('El hash de la redireccion no coincide. El cobro quedo cerrado y no se creo el outgoing payment.')
   }
   console.log('\nConsentimiento verificado.')
 
   // La aprobacion tarda lo bastante para que la conexion anterior ya este cerrada.
-  client = await openClient()
+  client = await open()
   const continued = await retryNetwork('Continuar el grant', () =>
     client.grant.continue(
       {
@@ -360,15 +229,14 @@ async function main(): Promise<void> {
   )
   const outgoingToken = accessTokenOf(continued, 'Continuation del outgoing payment')
 
-  const outgoingBody = {
-    walletAddress: sender.id,
-    quoteId: quote.id,
-    metadata: { description: 'Ejercicio Open Payments' }
-  }
   const created = await retryNetwork('Crear el outgoing payment', () =>
     client.outgoingPayment.create(
       { url: resourceBase(sender.resourceServer), accessToken: outgoingToken },
-      outgoingBody
+      {
+        walletAddress: sender.id,
+        quoteId: quote.id,
+        metadata: { description: 'Ejercicio Open Payments' }
+      }
     )
   )
   let latest = created
@@ -393,21 +261,3 @@ async function main(): Promise<void> {
   console.log('  Cobro:   ', incomingAfter.completed ? 'completo' : 'abierto')
   console.log('  Fallo:   ', latest.failed ? 'si' : 'no')
 }
-
-main().catch((error: unknown) => {
-  if (error instanceof OpenPaymentsClientError) {
-    console.error('\nLa API rechazo la peticion.')
-    console.error(error.message)
-    if (error.status) console.error('HTTP', error.status)
-    if (error.code) console.error('codigo', error.code)
-    if (error.description) console.error(error.description)
-    if (error.cause instanceof Error) console.error(error.cause.message)
-    if (error.validationErrors?.length) console.error(error.validationErrors.join('\n'))
-    if (error.details) console.error(JSON.stringify(error.details, null, 2))
-  } else if (error instanceof Error) {
-    console.error(`\n${error.message}`)
-  } else {
-    console.error(error)
-  }
-  process.exitCode = 1
-})
