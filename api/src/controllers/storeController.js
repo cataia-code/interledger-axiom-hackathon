@@ -1,9 +1,10 @@
-import { getPublicStore, listPublicStores, presentPublicStore } from '../services/sellerService.js';
+import { getPublicStore, listPublicStores, presentPublicStore, walletsByStore } from '../services/sellerService.js';
 import { getGeneralStats, getStoreStats } from '../services/statsService.js';
 
 export async function getStore(req, res, next) {
   try {
-    res.json({ store: presentPublicStore(await getPublicStore(req.params.id)) });
+    const row = await getPublicStore(req.params.id);
+    res.json({ store: { ...presentPublicStore(row), wallets: (await walletsByStore([row])).get(row.id) } });
   } catch (err) {
     next(err);
   }

@@ -113,7 +113,12 @@ Item = {
 }
 PublicStore = { id, name, description, city, address, latitude, longitude, currency, status,
   bannerUrl,   // imagen de portada 1600×600 (WebP) o null
-  iconUrl }    // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+  iconUrl,     // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+  wallets }    // wallets de la tienda (las de su dueño), la principal primero; [] si no ha vinculado ninguna
+StoreWallet = { id, name /* apodo o null */, address /* URL de la wallet de Open Payments */,
+  assetCode /* 'USD', 'COP'… */, assetScale /* decimales de esa moneda */, isPrimary }
+// La tienda cobra en la wallet principal. Úsalas para mostrar la divisa de cobro y convertir precios.
+// Aparecen en GET /stores/:id y en cada tienda de GET /stores (también con sort=score).
 // Las URLs son relativas al host: <host>/uploads/…
 Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 StoreStats  = {
