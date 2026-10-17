@@ -39,7 +39,7 @@ test('GET /me returns the current user with a bearer token', async () => {
   assert.equal(res.status, 200);
   assert.equal(res.body.user.email, email);
   assert.equal(res.body.user.role, 'buyer');
-  assert.deepEqual(Object.keys(res.body.user).sort(), ['country', 'email', 'emailVerified', 'id', 'name', 'phone', 'role']);
+  assert.deepEqual(Object.keys(res.body.user).sort(), ['country', 'countryName', 'email', 'emailVerified', 'id', 'name', 'phone', 'role']);
 });
 
 test('GET /me without or with an invalid token returns 401 JSON', async () => {
