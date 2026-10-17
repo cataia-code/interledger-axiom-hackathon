@@ -17,11 +17,16 @@ const GROUPS = {
     ['POST', '/api/v1/auth/seller/sign-in', { email: '', password: '' }],
     ['POST', '/api/v1/auth/seller/sign-in/otp', { email: '', otp: '' }],
   ],
+  'Estadísticas y puntaje': [
+    ['GET', '/api/v1/stats'],
+    ['GET', '/api/v1/stats?limit=10&city=Medellín'],
+    ['GET', '/api/v1/stores?sort=score'],
+    ['GET', '/api/v1/stores?sort=score&city=Medellín&limit=10'],
+    ['GET', '/api/v1/stores/:id/stats'],
+    ['GET', '/api/v1/seller/stats'],
+  ],
   Catálogo: [
     ['GET', '/api/v1/stores'],
-    ['GET', '/api/v1/stores?sort=score'],
-    ['GET', '/api/v1/stores/:id/stats'],
-    ['GET', '/api/v1/stats'],
     ['GET', '/api/v1/items'],
     ['GET', '/api/v1/items?storeId=:id'],
     ['GET', '/api/v1/items/:id'],
@@ -48,6 +53,9 @@ const GROUPS = {
     ['GET', '/api/v1/seller/organization'],
     ['GET', '/api/v1/seller/stats'],
     ['GET', '/api/v1/seller/store'],
+    ['PUT', '/api/v1/seller/store/banner', null, 'file'],
+    ['PUT', '/api/v1/seller/store/icon', null, 'file'],
+    ['POST', '/api/v1/seller/items/:id/images', null, 'file'],
     ['DELETE', '/api/v1/seller/store/banner'],
     ['DELETE', '/api/v1/seller/store/icon'],
     ['GET', '/api/v1/seller/orders'],
@@ -81,10 +89,14 @@ for (const [group, list] of Object.entries(GROUPS)) {
 
 preset.addEventListener('change', () => {
   if (preset.value === '') return;
-  const [method, path, body] = SPECS[Number(preset.value)];
+  const [method, path, body, kind] = SPECS[Number(preset.value)];
   $('method').value = method;
   $('path').value = path;
   $('body').value = body ? JSON.stringify(body, null, 2) : '';
+  // Los endpoints de imágenes reciben un archivo, no JSON.
+  $('bodyField').hidden = kind === 'file';
+  $('fileField').hidden = kind !== 'file';
+  if (kind !== 'file') $('file').value = '';
 });
 
 const esc = (s) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;');
@@ -117,7 +129,15 @@ $('form').addEventListener('submit', async (e) => {
   const body = $('body').value.trim();
   const headers = {};
   if (token) headers.Authorization = `Bearer ${token}`;
-  if (body && method !== 'GET') headers['Content-Type'] = 'application/json';
+  const file = $('file').files[0];
+  let payload;
+  if (file && method !== 'GET') {
+    payload = new FormData();
+    payload.append('image', file);
+  } else if (body && method !== 'GET') {
+    headers['Content-Type'] = 'application/json';
+    payload = body;
+  }
 
   setLoading(true);
   $('status').textContent = '';
@@ -129,7 +149,7 @@ $('form').addEventListener('submit', async (e) => {
     const r = await fetch($('path').value.trim(), {
       method,
       headers,
-      body: body && method !== 'GET' ? body : undefined,
+      body: payload,
     });
     const text = await r.text();
     const ms = Math.round(performance.now() - t0);
