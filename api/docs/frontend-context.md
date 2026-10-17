@@ -91,7 +91,9 @@ Límites: `legalName` 2-120, `taxId`/`legalId` 3-40 (únicos), `country` 2 letra
 
 | Método | Ruta | Notas |
 |---|---|---|
-| GET | `/stores` | Listado de tiendas **activas** (las pausadas/cerradas no salen), de la más nueva a la más antigua. Filtros: `q` (nombre/descripción), `city`, `limit` (1-50), `cursor`. → `{stores:[PublicStore], nextCursor}` |
+| GET | `/stores` | Listado de tiendas **activas** (las pausadas/cerradas no salen), de la más nueva a la más antigua. Filtros: `q` (nombre/descripción), `city`, `limit` (1-50), `cursor`. `sort`: `newest` (por defecto) o `score` (mejor puntaje primero; el `cursor` es un texto opaco, pásalo tal cual). Cada tienda trae `score`, `stars` y `level`. → `{stores:[PublicStore & {score, stars, level}], nextCursor}`. Se puede cachear 60 s |
+| GET | `/stores/:id/stats` | Puntaje y contadores de la tienda, sin dinero. → `{stats: StoreStats}` (ver abajo). Cacheable 60 s |
+| GET | `/stats` | Panorama del marketplace y ranking. Query opcional: `limit` (1-20, por defecto 5), `city`. → `{stats: {stores:{active,paused}, items:{active}, orders:{total,last30d,byStatus}, users:{buyers,sellers}, topStores:[{id,name,city,iconUrl,score,stars,level}], generatedAt}}`. Cacheable 60 s |
 | GET | `/items` | Filtros: `categoryId`, `storeId`, `q` (texto), `sort` (`newest`\|`price_asc`\|`price_desc`), `limit` (1-50), `cursor`. → `{items:[Item], nextCursor}` |
 | GET | `/items/:id` | → `{item: Item}` |
 | GET | `/stores/:id` | → `{store: PublicStore}`; 404 si está cerrada |
@@ -114,6 +116,18 @@ PublicStore = { id, name, description, city, address, latitude, longitude, curre
   iconUrl }    // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
 // Las URLs son relativas al host: <host>/uploads/…
 Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
+StoreStats  = {
+  storeId,
+  score,        // 0-100, aproximado (no son reseñas de compradores)
+  stars,        // score / 20, un decimal
+  level,        // 'new' (menos de 3 pedidos terminados) | 'bronze' <40 | 'silver' 40-64 | 'gold' 65-84 | 'platinum' 85+
+  confidence,   // 'low' (<5 pedidos terminados) | 'medium' (5-19) | 'high' (20+)
+  breakdown: { catalog /*30*/, sales /*40*/, reliability /*20*/, activity /*10*/ },
+  metrics: { activeItems, itemsInStock, itemsWithImages, ordersCompleted, ordersCancelled, ordersRefunded,
+             completionRate /* 0-1 o null */, unitsSold, uniqueBuyers, repeatBuyers, ordersLast30d, memberSinceDays },
+  generatedAt
+}
+// Con confidence 'low' o level 'new' conviene mostrar "Nueva" en vez de estrellas.
 ```
 
 `percent`: `value` en puntos base (1500 = 15 %). `fixed`: monto en centavos.
@@ -174,6 +188,7 @@ Todo se limita a la sucursal del vendedor (1 sucursal por organización). Lo aje
 | PUT | `/seller/store/banner` | `multipart/form-data`, campo **`image`** (JPEG/PNG/WebP ≤5 MB). Se recorta a 1600×600. Reemplaza el anterior. → `{store}` |
 | PUT | `/seller/store/icon` | Igual; se recorta a un círculo de 256×256 con fondo transparente |
 | DELETE | `/seller/store/banner` · `/seller/store/icon` | Quita la imagen. → `{store}` |
+| GET | `/seller/stats` | Lo de `StoreStats` más lo privado: `sales: {currency, completedAmount, last30dAmount, averageOrderAmount, refundedAmount}` (unidades menores), `ordersByStatus`, `alerts: {lowStockItems, itemsWithoutImages, draftItems}` y `tips` (consejos en texto). Nunca se cachea |
 | GET/PATCH | `/seller/store` | PATCH: nombre, descripción, dirección, ciudad, teléfono, lat/lon, `status` (`active`\|`paused`) |
 | DELETE | `/seller/store` | Cierra la sucursal (borrado lógico); el vendedor ya no podrá iniciar sesión (`STORE_REQUIRED`) |
 

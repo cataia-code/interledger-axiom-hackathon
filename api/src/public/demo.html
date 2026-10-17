@@ -97,6 +97,11 @@
       <label for="body">Body JSON (opcional)</label>
       <textarea id="body" rows="5" spellcheck="false" placeholder='{ "clave": "valor" }'></textarea>
     </div>
+    <div class="field" id="fileField" hidden>
+      <label for="file">Imagen (JPEG, PNG o WebP, hasta 5 MB)</label>
+      <input id="file" type="file" accept="image/jpeg,image/png,image/webp">
+      <div class="hint">Se envía como <code>multipart/form-data</code> en el campo <code>image</code>.</div>
+    </div>
     <div class="actions">
       <button id="send" type="submit"><span class="spinner"></span><span id="sendLabel">Enviar petición</span></button>
     </div>
