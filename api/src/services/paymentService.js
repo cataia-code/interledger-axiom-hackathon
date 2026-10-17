@@ -1,6 +1,9 @@
-import { and, asc, desc, eq, inArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
+import { config } from '../config/index.js';
 import { db } from '../db/index.js';
 import { order } from '../db/orders.js';
+import { organization, store } from '../db/business.js';
+import { userWallet, paymentSession } from '../db/wallets.js';
 import { payment, paymentEvent, refund } from '../db/payments.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { provider } from '../payments/index.js';
@@ -9,6 +12,20 @@ import { transitionOrder } from './orderStateMachine.js';
 import { refundedTotal, refundPayment } from './paymentCore.js';
 
 const PAID = ['captured', 'partially_refunded', 'refunded'];
+
+// Lo que el front muestra antes de redirigir: cuánto llega, cuánto sale, la comisión y hasta cuándo vale la cotización.
+export function presentCheckout(s) {
+  const sameAsset = s.receiveAssetCode === s.debitAssetCode && s.receiveAssetScale === s.debitAssetScale;
+  const amt = (value, assetCode, assetScale) => ({ value, assetCode, assetScale });
+  return {
+    redirectUrl: s.redirectUrl,
+    buyerWallet: s.buyerWallet,
+    expiresAt: s.quoteExpiresAt,
+    receive: amt(s.receiveValue, s.receiveAssetCode, s.receiveAssetScale),
+    debit: amt(s.debitValue, s.debitAssetCode, s.debitAssetScale),
+    fee: sameAsset ? amt((BigInt(s.debitValue) - BigInt(s.receiveValue)).toString(), s.debitAssetCode, s.debitAssetScale) : null,
+  };
+}
 
 export const presentPayment = (p, refunds = []) => ({
   id: p.id,
@@ -41,19 +58,31 @@ async function ownOrder(buyerId, idParam) {
   return row;
 }
 
+const presentWithCheckout = async (p, created) => {
+  const [session] = await db
+    .select()
+    .from(paymentSession)
+    .where(and(eq(paymentSession.paymentId, p.id), eq(paymentSession.status, 'pending')))
+    .orderBy(desc(paymentSession.id))
+    .limit(1);
+  return { payment: presentPayment(p), checkout: session ? presentCheckout(session) : null, created };
+};
+
 // Inicia el cobro de un pedido pendiente. Repetir la misma clave, o pedir otro cobro mientras hay uno pendiente,
 // devuelve el existente: nunca se crean dos cobros simultáneos para el mismo pedido.
-export async function startPayment(userId, idParam, rawKey) {
+export async function startPayment(userId, idParam, rawKey, body = {}) {
   const buyerId = Number(userId);
   const key = parseKey(rawKey);
   const o = await ownOrder(buyerId, idParam);
   const mine = await db.select().from(payment).where(eq(payment.orderId, o.id)).orderBy(desc(payment.id));
   const sameKey = mine.find((p) => p.idempotencyKey === key);
-  if (sameKey) return { payment: presentPayment(sameKey), created: false };
+  const openPayments = provider.name === 'openpayments';
+  if (sameKey && !(openPayments && sameKey.status === 'pending')) return { payment: presentPayment(sameKey), created: false };
   if (o.status !== 'pending_payment' || o.expiresAt <= new Date()) {
     throw new HttpError(409, 'This order cannot be paid', 'ORDER_NOT_PAYABLE');
   }
   const pending = mine.find((p) => p.status === 'pending');
+  if (openPayments) return startOpenPayment(buyerId, o, pending, key, object(body).walletId);
   if (pending) return { payment: presentPayment(pending), created: false };
 
   try {
@@ -74,6 +103,143 @@ export async function startPayment(userId, idParam, rawKey) {
     }
     throw err;
   }
+}
+
+// ---------- Open Payments ----------
+// Wallet principal del usuario (la que cobra una tienda y con la que paga un comprador por defecto).
+const primaryWalletOf = async (userId) =>
+  (await db.select().from(userWallet).where(and(eq(userWallet.userId, userId), eq(userWallet.isPrimary, true))))[0];
+
+// El comprador puede elegir una de sus wallets con `walletId`; si no, se usa la principal.
+async function buyerWalletFor(userId, walletId) {
+  if (walletId === undefined || walletId === null) return primaryWalletOf(userId);
+  const id = integer(walletId, 'walletId', 1, Number.MAX_SAFE_INTEGER, 'INVALID_WALLET_ID');
+  const [w] = await db.select().from(userWallet).where(and(eq(userWallet.id, id), eq(userWallet.userId, userId)));
+  if (!w) throw new HttpError(404, 'Wallet not found', 'WALLET_NOT_FOUND');
+  return w;
+}
+
+// Moneda menor de la orden (2 decimales para USD, COP con la escala ISO) llevada a la escala de la wallet del vendedor.
+function toWalletUnits(amount, currency, assetScale) {
+  const orderScale = new Intl.NumberFormat('en', { style: 'currency', currency }).resolvedOptions().maximumFractionDigits;
+  if (assetScale >= orderScale) return (BigInt(amount) * 10n ** BigInt(assetScale - orderScale)).toString();
+  const divisor = 10n ** BigInt(orderScale - assetScale);
+  if (BigInt(amount) % divisor !== 0n) throw new HttpError(409, 'The total cannot be expressed in the seller wallet scale', 'AMOUNT_NOT_REPRESENTABLE');
+  return (BigInt(amount) / divisor).toString();
+}
+
+// Si hay una cotización vigente se reutiliza; si venció (o nunca hubo), se pide otra: una cotización no se reutiliza vencida.
+async function startOpenPayment(buyerId, o, pending, key, walletId) {
+  const buyerWallet = await buyerWalletFor(buyerId, walletId);
+  if (!buyerWallet) throw new HttpError(409, 'Link your wallet address before paying', 'BUYER_WALLET_REQUIRED');
+  if (pending) {
+    const [live] = await db
+      .select()
+      .from(paymentSession)
+      .where(and(eq(paymentSession.paymentId, pending.id), eq(paymentSession.status, 'pending')))
+      .orderBy(desc(paymentSession.id))
+      .limit(1);
+    if (live && live.quoteExpiresAt > new Date() && live.buyerWallet === buyerWallet.address) return { payment: presentPayment(pending), checkout: presentCheckout(live), created: false };
+  }
+  const [owner] = await db
+    .select({ userId: organization.userId })
+    .from(store)
+    .innerJoin(organization, eq(organization.id, store.organizationId))
+    .where(eq(store.id, o.storeId));
+  const sellerWallet = owner && (await primaryWalletOf(owner.userId));
+  if (!sellerWallet) throw new HttpError(409, 'The store has not linked a wallet to receive payments', 'SELLER_WALLET_REQUIRED');
+  if (sellerWallet.assetCode !== o.currency) {
+    throw new HttpError(409, `The store wallet receives ${sellerWallet.assetCode}, the order is in ${o.currency}`, 'CURRENCY_MISMATCH');
+  }
+
+  const { providerRef, session } = await provider.begin({
+    orderId: o.id,
+    buyerWallet: buyerWallet.address,
+    sellerWallet: sellerWallet.address,
+    receiveValue: toWalletUnits(o.totalAmount, o.currency, sellerWallet.assetScale),
+    returnUrl: `${config.publicApiUrl}/api/v1/payments/openpayments/return/${o.id}`,
+  });
+  try {
+    const saved = await db.transaction(async (tx) => {
+      let p = pending;
+      if (p) {
+        await tx.update(paymentSession).set({ status: 'superseded' }).where(and(eq(paymentSession.paymentId, p.id), eq(paymentSession.status, 'pending')));
+        [p] = await tx.update(payment).set({ providerRef }).where(eq(payment.id, p.id)).returning();
+      } else {
+        [p] = await tx
+          .insert(payment)
+          .values({ orderId: o.id, provider: provider.name, providerRef, amount: o.totalAmount, currency: o.currency, idempotencyKey: key })
+          .returning();
+      }
+      const [s] = await tx.insert(paymentSession).values({ paymentId: p.id, ...session }).returning();
+      return { p, s };
+    });
+    return { payment: presentPayment(saved.p), checkout: presentCheckout(saved.s), created: !pending };
+  } catch (err) {
+    // Otra petición con la misma clave ganó la carrera: se devuelve su cobro.
+    if (uniqueViolation(err, 'payment_order_idempotency_unique')) {
+      const [p] = await db.select().from(payment).where(and(eq(payment.orderId, o.id), eq(payment.idempotencyKey, key)));
+      return presentWithCheckout(p, false);
+    }
+    throw err;
+  }
+}
+
+// Vuelta del navegador desde la wallet. Es pública: quien manda es el hash firmado con el nonce de la sesión, y solo un hash
+// válido cambia algo. El resultado se decide por lo que realmente se movió, no por haber vuelto al navegador.
+export async function completeOpenPayment(orderIdParam, query) {
+  const orderId = parseId(orderIdParam, 'Order not found', 'ORDER_NOT_FOUND');
+  const [p] = await db.select().from(payment).where(and(eq(payment.orderId, orderId), ne(payment.status, 'cancelled'))).orderBy(desc(payment.id)).limit(1);
+  if (!p) throw new HttpError(404, 'Order not found', 'ORDER_NOT_FOUND');
+  if (PAID.includes(p.status)) return { status: 'paid', orderId };
+  const interactRef = typeof query.interact_ref === 'string' ? query.interact_ref : '';
+  const hash = typeof query.hash === 'string' ? query.hash : '';
+  if (!interactRef || !hash) return { status: 'denied', orderId }; // consentimiento negado: el pedido sigue sin pagar
+
+  // Reclama la sesión de forma atómica para que dos retornos simultáneos no creen dos outgoing payments.
+  const [live] = await db
+    .select()
+    .from(paymentSession)
+    .where(and(eq(paymentSession.paymentId, p.id), eq(paymentSession.status, 'pending')))
+    .orderBy(desc(paymentSession.id))
+    .limit(1);
+  if (!live) throw new HttpError(409, 'There is no payment waiting for approval', 'NO_PENDING_SESSION');
+  if (live.quoteExpiresAt <= new Date()) throw new HttpError(409, 'The quote expired; start the payment again', 'QUOTE_EXPIRED');
+  if (!provider.verifyInteraction(live, hash, interactRef)) throw new HttpError(400, 'Invalid consent signature', 'INVALID_INTERACTION_HASH');
+  const [claimed] = await db
+    .update(paymentSession)
+    .set({ status: 'processing' })
+    .where(and(eq(paymentSession.id, live.id), eq(paymentSession.status, 'pending')))
+    .returning();
+  if (!claimed) return { status: 'processing', orderId };
+
+  let result;
+  try {
+    result = await provider.complete({ session: claimed, hash, interactRef });
+  } catch (err) {
+    await db.update(paymentSession).set({ status: 'failed' }).where(eq(paymentSession.id, claimed.id));
+    throw err;
+  }
+  await db.transaction(async (tx) => {
+    await tx
+      .insert(paymentEvent)
+      .values({
+        paymentId: p.id,
+        providerEventId: `op:${result.outgoingPaymentId}`,
+        type: result.status === 'paid' ? 'payment.captured' : 'payment.failed',
+        payload: { sessionId: claimed.id, outgoingPaymentId: result.outgoingPaymentId },
+        processedAt: new Date(),
+      })
+      .onConflictDoNothing();
+    await tx
+      .update(paymentSession)
+      .set({ status: result.status === 'paid' ? 'completed' : 'failed', outgoingPaymentId: result.outgoingPaymentId })
+      .where(eq(paymentSession.id, claimed.id));
+    const [fresh] = await tx.select().from(payment).where(eq(payment.id, p.id));
+    if (result.status === 'paid') await capture(tx, fresh);
+    else await fail(tx, fresh);
+  });
+  return { status: result.status, orderId };
 }
 
 // Cobro confirmado: el pedido pasa a pagado. Si ya no se puede (venció y no queda stock, o ya estaba cancelado),
@@ -104,6 +270,7 @@ async function fail(tx, p) {
 // Webhook del proveedor. El evento se guarda y se procesa en la misma transacción: si algo falla se revierte
 // todo y el proveedor puede reenviarlo; si ya se procesó, el reenvío se ignora.
 export async function handleWebhook(headers, body) {
+  if (!provider.verifyWebhook) throw new HttpError(404, 'Not found', 'NOT_FOUND');
   const event = provider.verifyWebhook(headers, body);
   return db.transaction(async (tx) => {
     const [recorded] = await tx
