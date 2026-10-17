@@ -8,6 +8,7 @@ import * as seller from '../controllers/sellerController.js';
 import * as catalog from '../controllers/catalogController.js';
 import * as orderCtl from '../controllers/orderController.js';
 import * as paymentCtl from '../controllers/paymentController.js';
+import { COUNTRIES } from '../services/countries.js';
 import { generalLimit, limiter } from '../middlewares/rateLimit.js';
 import { uploadImage } from '../middlewares/upload.js';
 import { requireAuth, requireRole } from '../middlewares/auth.js';
@@ -18,6 +19,9 @@ router.use(generalLimit);
 
 router.get('/health', getHealth);
 router.get('/ping', getPing);
+router.get('/countries', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400').json({ countries: COUNTRIES });
+});
 router.get('/me', requireAuth, getMe);
 router.patch('/me', requireAuth, patchMe);
 router.get('/me/wallets', requireAuth, meWallet.list);

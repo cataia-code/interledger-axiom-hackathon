@@ -46,7 +46,7 @@ Rutas genéricas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`): `{ "mes
 
 Cada rol tiene sus propias rutas. Un login solo acepta cuentas de su rol (si no, 403 `WRONG_ROLE`). No se puede enviar el rol desde el cliente: lo fija la ruta de registro.
 
-Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified", "country" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
+Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified", "country", "countryName" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
@@ -59,12 +59,12 @@ Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name"
 | POST | `/auth/email-otp/request-password-reset` | `{email}` | Envía código |
 | POST | `/auth/email-otp/reset-password` | `{email, otp, password}` | Cambia contraseña y revoca sesiones previas |
 | POST | `/auth/sign-out` | `{}` + Bearer | Revoca el token |
-| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone,country}}` |
-| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null), country?(ISO 2 letras \| null)}` | 400 `INVALID_COUNTRY` si no es un código válido |
+| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone,country,countryName}}` |
+| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null), country?(código ISO o nombre \| null)}` | 400 `INVALID_COUNTRY` si no es un código válido |
 
 Códigos OTP: 6 dígitos, caducan en 10 min, 3 intentos. Los códigos nuevos invalidan el anterior.
 
-**País de origen del usuario (`country`):** código ISO 3166-1 de 2 letras (`CO`, `PA`, `MX`…), opcional al registrarse (comprador o vendedor), se guarda en mayúsculas y se devuelve como `user.country` (`null` si no se dio). Un valor inválido responde 400 `INVALID_COUNTRY` y **no crea la cuenta**. Se puede cambiar o borrar con `PATCH /me`. En el vendedor es independiente de `organization.country` (país legal de la organización).
+**País de origen del usuario (`country`):** opcional al registrarse (comprador o vendedor) y editable con `PATCH /me`. Se envía el **código ISO 3166-1 de 2 letras** (`CO`) **o el nombre del país** en español o inglés, sin importar mayúsculas ni tildes (`Colombia`, `panamá`, `Spain`). La API siempre guarda y devuelve el código en `user.country` y el nombre en español en `user.countryName` (`null` y `null` si no se dio). Solo valen los 249 países oficiales; cualquier otro valor responde 400 `INVALID_COUNTRY` y **no crea la cuenta**. En el vendedor es independiente de `organization.country` (país legal de la organización). Para un desplegable usa `GET /countries`.
 
 **Body de `seller/sign-up`:**
 
@@ -226,6 +226,8 @@ Estados de ítem: `draft` / `active` / `inactive`. Solo los `active` de una sucu
 Transiciones del seller: `paid→preparing`, `preparing→completed`, y `cancelled` desde `paid`/`preparing`.
 
 ## Utilidad
+
+`GET /countries` → `{ countries: [{ code: "CO", name: "Colombia" }, …] }` (249 países oficiales, ordenados por nombre en español, público y cacheable un día). Úsalo para el desplegable de país.
 
 `GET /health` → `{"status":"ok"}` · `GET /ping` → `{"message":"pong","count":n}`
 

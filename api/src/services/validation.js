@@ -1,16 +1,15 @@
 import { HttpError } from '../middlewares/errorHandler.js';
+import { resolveCountry } from './countries.js';
 
 export const bad = (message, code) => new HttpError(400, message, code);
 export const str = (v) => (typeof v === 'string' ? v.trim() : '');
 export const object = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
-// País de origen: código ISO 3166-1 de 2 letras que existe de verdad (se guarda en mayúsculas).
-const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+// País de origen: código ISO 3166-1 de 2 letras o nombre del país; se guarda el código en mayúsculas.
 export function countryCode(value, field = 'country', code = 'INVALID_COUNTRY') {
-  const v = str(value).toUpperCase();
-  const known = /^[A-Z]{2}$/.test(v) && regionNames.of(v) !== v && regionNames.of(v) !== 'Unknown Region';
-  if (!known) throw bad(`${field} must be a valid 2-letter ISO 3166-1 country code`, code);
-  return v;
+  const resolved = resolveCountry(value);
+  if (!resolved) throw bad(`${field} must be an ISO 3166-1 country code (e.g. CO) or a country name (e.g. Colombia)`, code);
+  return resolved;
 }
 
 export function required(value, field, min, max, code) {

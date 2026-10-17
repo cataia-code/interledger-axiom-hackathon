@@ -1,4 +1,5 @@
 import { updateProfile } from '../services/profileService.js';
+import { countryName } from '../services/countries.js';
 
 const present = ({ id, email, name, role, emailVerified, phone, country }) => ({
   id: Number(id),
@@ -8,6 +9,7 @@ const present = ({ id, email, name, role, emailVerified, phone, country }) => ({
   emailVerified,
   phone: phone ?? null,
   country: country ?? null,
+  countryName: countryName(country),
 });
 
 export function getMe(req, res) {

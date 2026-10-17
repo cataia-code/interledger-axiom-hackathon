@@ -23,9 +23,11 @@ test('buyer sign-up stores the country (uppercased) and sign-in and /me return i
   const up = await post('/buyer/sign-up', { email: e, password: PASSWORD, name: 'Ana', country: 'co' });
   assert.equal(up.status, 201);
   assert.equal(up.body.user.country, 'CO');
-  assert.equal((await me(up.body.token)).body.user.country, 'CO');
+  assert.equal(up.body.user.countryName, 'Colombia');
+  const profile = (await me(up.body.token)).body.user;
+  assert.deepEqual([profile.country, profile.countryName], ['CO', 'Colombia']);
   const inn = await post('/buyer/sign-in', { email: e, password: PASSWORD });
-  assert.equal(inn.body.user.country, 'CO');
+  assert.deepEqual([inn.body.user.country, inn.body.user.countryName], ['CO', 'Colombia']);
   assert.equal(inn.body.user.role, 'buyer');
 });
 
@@ -33,6 +35,7 @@ test('country is optional at sign-up and null when omitted', async () => {
   const up = await post('/buyer/sign-up', { email: email(), password: PASSWORD, name: 'Sin país' });
   assert.equal(up.status, 201);
   assert.equal(up.body.user.country, null);
+  assert.equal(up.body.user.countryName, null);
   assert.equal((await me(up.body.token)).body.user.country, null);
 });
 
@@ -49,7 +52,7 @@ test('seller sign-up accepts the user country apart from the organization countr
 });
 
 test('an invalid country is rejected before creating the account', async () => {
-  for (const country of ['Colombia', 'C', 'XX', 'ZZ', '12', 5]) {
+  for (const country of ['C', 'XX', 'ZZ', '12', 5, 'EU', 'UK', 'COL', 'Narnia']) {
     const e = email();
     const res = await post('/buyer/sign-up', { email: e, password: PASSWORD, name: 'X', country });
     assert.equal(res.status, 400, String(country));
@@ -62,12 +65,36 @@ test('an invalid country is rejected before creating the account', async () => {
   assert.equal((await post('/seller/sign-in', { email: seller.email, password: PASSWORD })).status, 401);
 });
 
+test('a country can be given by name (Spanish or English, any case or accent) and is stored as its code', async () => {
+  const cases = [['Colombia', 'CO', 'Colombia'], ['panamá', 'PA', 'Panamá'], ['PANAMA', 'PA', 'Panamá'], ['Spain', 'ES', 'España'], ['estados unidos', 'US', 'Estados Unidos'], ['USA', 'US', 'Estados Unidos']];
+  for (const [given, code, name] of cases) {
+    const up = await post('/buyer/sign-up', { email: email(), password: PASSWORD, name: 'N', country: given });
+    assert.equal(up.status, 201, given);
+    assert.deepEqual([up.body.user.country, up.body.user.countryName], [code, name], given);
+  }
+  const { token } = (await post('/buyer/sign-up', { email: email(), password: PASSWORD, name: 'N' })).body;
+  const patched = await patch(token, { country: 'México' });
+  assert.deepEqual([patched.body.user.country, patched.body.user.countryName], ['MX', 'México']);
+});
+
+test('GET /countries lists the 249 official countries with Spanish names', async () => {
+  const res = await request(app).get(`${api}/countries`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.countries.length, 249);
+  assert.deepEqual(res.body.countries.find((c) => c.code === 'CO'), { code: 'CO', name: 'Colombia' });
+  assert.deepEqual(res.body.countries.find((c) => c.code === 'ES'), { code: 'ES', name: 'España' });
+  for (const code of ['EU', 'UN', 'UK', 'XA']) assert.equal(res.body.countries.some((c) => c.code === code), false, code);
+  const names = res.body.countries.map((c) => c.name);
+  assert.deepEqual(names, [...names].sort((a, b) => a.localeCompare(b, 'es')), 'sorted by name');
+  assert.match(res.headers['cache-control'], /max-age/);
+});
+
 test('PATCH /me sets, changes and clears the country', async () => {
   const { token } = (await post('/buyer/sign-up', { email: email(), password: PASSWORD, name: 'Ana' })).body;
   assert.equal((await patch(token, { country: 'mx' })).body.user.country, 'MX');
   assert.equal((await me(token)).body.user.country, 'MX');
   assert.equal((await patch(token, { country: 'ES', name: 'Ana B' })).body.user.country, 'ES');
   assert.equal((await patch(token, { country: null })).body.user.country, null);
-  assert.equal((await patch(token, { country: 'Spain' })).body.error.code, 'INVALID_COUNTRY');
+  assert.equal((await patch(token, { country: 'Narnia' })).body.error.code, 'INVALID_COUNTRY');
   assert.equal((await patch(token, {})).body.error.code, 'EMPTY_UPDATE');
 });
