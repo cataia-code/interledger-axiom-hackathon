@@ -2,7 +2,7 @@
 
 Cliente de prueba de Open Payments. Vive en `payments/`; ejecuta los comandos desde esa carpeta.
 
-Recorre un pago contra la red de pruebas de Interledger e imprime la cotización, la comisión y el cierre. Usa dinero de juego. Hacen falta dos wallet addresses: una paga y otra recibe.
+Recorre un pago contra las wallets de test de Interledger e imprime la cotización, la comisión y el cierre. Hacen falta dos wallet addresses: una paga y otra recibe.
 
 Para llevar este flujo al checkout de `api/`, la instrucción está en [INTEGRACION.md](INTEGRACION.md).
 
@@ -36,3 +36,11 @@ npm run pay -- --buyer https://ilp.interledger-test.dev/quien-paga --seller http
 `--buyer` es quien paga. `--seller` es quien recibe. `--amount` es lo que debe llegar, en la moneda de su cuenta. Si lo omites, usa `1.00`.
 
 El script imprime una URL. Ábrela, inicia sesión con la cuenta que paga y aprueba. Esa aprobación es el único paso de la persona. La wallet vuelve a `http://localhost:3344/callback` y el script termina solo. Con `assetScale` 2, `10.00` se envía a la API como `1000`.
+
+## Consultas
+
+`wallet`, `quote` e `incoming` leen una wallet o una cotización. No son pasos del cobro.
+
+```bash
+npm run op -- wallet --url https://ilp.interledger-test.dev/quien-cobra
+```

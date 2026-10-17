@@ -19,10 +19,20 @@ cp .env.example .env
 - `npm test`: pruebas (`node --test` + supertest)
 
 ## Endpoints
-- `GET /api/v1/health` → `{ "status": "ok" }`
-- `GET /api/v1/ping` → `{ "message": "pong", "count": n }`
+
+`GET /api/v1/health` responde `{ "status": "ok" }`. El contrato del marketplace (auth, tiendas, pedidos, wallets y `POST /api/v1/orders/:id/pay`) está en [`docs/frontend-context.md`](docs/frontend-context.md). El probador corre en `/demo.html` con el servidor levantado.
 
 Los errores responden `{ "error": { "message", "code" } }`.
+
+## Pagos y datos de ejemplo
+
+`PAYMENT_PROVIDER` en `.env` elige `placeholder` o `openpayments`. Con `openpayments` hacen falta `OP_CLIENT_WALLET_ADDRESS`, `OP_KEY_ID` y la llave (`OP_PRIVATE_KEY` o `OP_PRIVATE_KEY_PATH`). El detalle está en [`.env.example`](.env.example) y en [`docs/openpayments-integration.html`](docs/openpayments-integration.html).
+
+```bash
+npm run seed
+```
+
+Carga las tiendas de ejemplo. El despliegue está en [`docs/deploy-railway.md`](docs/deploy-railway.md).
 
 ## Estructura
 `src/{config,middlewares,routes,controllers,services}`, `test/`.
