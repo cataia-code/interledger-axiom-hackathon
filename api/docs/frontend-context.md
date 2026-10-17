@@ -180,7 +180,7 @@ Payment = { id, orderId, provider, providerRef, status, amount, currency, create
 
 1. `GET /stores` → elegir tienda → `GET /items?storeId=X` (o `GET /items` para búsqueda global) → `PUT /cart/items/:id` (varias veces) → `GET /cart`.
 2. `POST /orders` (con `Idempotency-Key`): congela precios y **reserva el stock 15 min** (`expiresAt`).
-3. `POST /orders/:id/pay` (con otra `Idempotency-Key`; con Open Payments puedes mandar `{walletId}` para pagar con otra wallet del comprador, si no usa la principal). Con `PAYMENT_PROVIDER=openpayments` la respuesta trae `checkout` (`receive`, `debit`, `fee`, `expiresAt`, `redirectUrl`): muéstralo, deja que el comprador acepte y abre `redirectUrl` completa (no la cortes en el `&`). La wallet vuelve al backend, que redirige a `FRONTEND_URL?payment=paid|failed|denied&order=ID`; confirma con `GET /orders/:id`. Si `expiresAt` pasó, repite `POST /pay` y se cotiza de nuevo. Lo siguiente describe el modo placeholder. El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
+3. `POST /orders/:id/pay` (con otra `Idempotency-Key`; con Open Payments puedes mandar `{walletId}` para pagar con otra wallet del comprador, si no usa la principal). Con `PAYMENT_PROVIDER=openpayments` la respuesta trae `checkout` (`receive`, `debit`, `fee`, `expiresAt`, `redirectUrl`): muéstralo, deja que el comprador acepte y abre `redirectUrl` completa (no la cortes en el `&`). La wallet vuelve al backend, que muestra en esa misma ventana una **página de resultado** ("Pago exitoso", "Pago declinado"… con el diseño de Lokora) y la cierra sola a los 3 segundos; ver *Ventana de pago* abajo. Confirma siempre con `GET /orders/:id`. Si `expiresAt` pasó, repite `POST /pay` y se cotiza de nuevo. Lo siguiente describe el modo placeholder. El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
 4. Si no se paga en 15 min el pedido se cancela solo y se libera el stock.
 
 ### Estados del pedido
@@ -251,6 +251,20 @@ Estados de ítem: `draft` / `active` / `inactive`. Solo los `active` de una sucu
 | POST | `/seller/orders/:id/refunds` | `{amount?, reason?}`; sin `amount` reembolsa lo que falta. 409 `REFUND_EXCEEDS_PAYMENT`; para el total de un pedido sin completar, usar cancelar (`USE_CANCEL`) |
 
 Transiciones del seller: `paid→preparing`, `preparing→completed`, y `cancelled` desde `paid`/`preparing`.
+
+## Ventana de pago
+
+Con Open Payments el pago se aprueba en otra ventana. Al terminar, el navegador de esa ventana llega a `GET /payments/openpayments/return/:orderId` y la API responde una **página HTML** (no JSON) con el resultado: *Pago exitoso*, *Pago declinado*, *No se pudo completar el pago*, *Estamos confirmando tu pago* o un error (por ejemplo *La cotización venció*). La página dice "Esta ventana se cerrará en 3 s" (6 s en un error) y llama a `window.close()`; si el navegador no lo permite, muestra "Ya puedes cerrar esta ventana", con un botón **Volver a la app** si `FRONTEND_URL` está definida.
+
+**Qué debe hacer la ventana principal (la que abrió el pago):**
+1. Abrir el pago dentro del clic: `const pop = window.open(checkout.redirectUrl, 'lokora-pay')` (si no, el navegador la bloquea).
+2. Enterarse del resultado, en este orden de fiabilidad:
+   - **Consultar `GET /orders/:id`** cada 2 a 3 segundos mientras la ventana siga abierta o hasta que `status` cambie (`paid`). Es lo único que siempre funciona y lo único que hay que creer.
+   - Opcional, para reaccionar al instante: `window.addEventListener('message', e => …)` con `e.data = { source: 'lokora-payments', type: 'payment-result', status, orderId }`. La wallet puede cortar la relación con la ventana, así que puede no llegar. Tampoco cruza orígenes un `BroadcastChannel('lokora-payments')`; solo sirve si la API y el front comparten origen.
+   - Si `pop.closed` pasa a `true` sin que el pedido cambie, la persona cerró la ventana sin aprobar: deja de consultar y ofrece reintentar.
+3. Con `status: "paid"` en el pedido, pasar a la pantalla de éxito. Los valores de `status` de la página (`paid`, `denied`, `failed`, `processing`, `error`) son solo informativos.
+
+Clientes de API (cualquier petición que no pida `text/html`) conservan el comportamiento anterior: JSON `{ status, orderId }`, o redirección a `FRONTEND_URL?payment=…&order=ID` si está definida.
 
 ## Cupones
 
