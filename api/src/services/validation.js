@@ -4,6 +4,15 @@ export const bad = (message, code) => new HttpError(400, message, code);
 export const str = (v) => (typeof v === 'string' ? v.trim() : '');
 export const object = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
+// País de origen: código ISO 3166-1 de 2 letras que existe de verdad (se guarda en mayúsculas).
+const regionNames = new Intl.DisplayNames(['en'], { type: 'region' });
+export function countryCode(value, field = 'country', code = 'INVALID_COUNTRY') {
+  const v = str(value).toUpperCase();
+  const known = /^[A-Z]{2}$/.test(v) && regionNames.of(v) !== v && regionNames.of(v) !== 'Unknown Region';
+  if (!known) throw bad(`${field} must be a valid 2-letter ISO 3166-1 country code`, code);
+  return v;
+}
+
 export function required(value, field, min, max, code) {
   const v = str(value);
   if (v.length < min || v.length > max) throw bad(`${field} must be between ${min} and ${max} characters`, code);

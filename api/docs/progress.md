@@ -92,9 +92,18 @@ Implementa los requerimientos MVP de `docs/requirements.html` (51 de 61; el rest
 - Auditoría completa en `docs/audit-report.html`: 65 pruebas, 116 comprobaciones de caja negra, 22 de integridad de datos, rendimiento y escala (100 000 ítems).
 - Correcciones: manejador `pool.on('error')` (la API se caía si Postgres cortaba una conexión), rate limit en toda la API y en checkout, pago, imágenes y webhook (`src/middlewares/rateLimit.js`), `CORS_ORIGIN` obligatorio y sin `*` en producción, `TRUST_PROXY`, e índices (`pg_trgm`, precio) en la migración `0006`. Pruebas: 71/71 (`test/hardening.test.js`).
 
+## Open Payments (rama `feature/init_openpayment`)
+
+- Proveedor `openpayments` (`src/payments/openpayments.js`, SDK `@interledger/open-payments`) según `payments/INTEGRACION.md`: `POST /orders/:id/pay` devuelve cotización, comisión, vencimiento y `redirectUrl`; `GET /payments/openpayments/return/:orderId` verifica el hash, continúa el grant, crea el outgoing payment y marca el pedido pagado solo si llegó el monto cotizado.
+- Wallets por usuario (varias, con `name` que define el usuario y una principal): `GET/POST /me/wallets`, `PATCH/DELETE /me/wallets/:id` (tabla `user_wallet`, migraciones `0008` y `0009`). El comprador paga con su principal o elige otra con `walletId` en `POST /orders/:id/pay`; la tienda cobra en la principal del dueño. Sin wallet: 409 `BUYER_WALLET_REQUIRED` / `SELLER_WALLET_REQUIRED`.
+- Tabla `payment_session` guarda lo que hace falta entre el checkout y la vuelta (nonce, continuación, cotización). Cotización vencida: se pide otra, nunca se reutiliza.
+- Se activa con `PAYMENT_PROVIDER=openpayments`; `placeholder` sigue por defecto (dev y tests). Pruebas: 93/93 (`test/openpayments.test.js` con cliente simulado).
+- Fuera de alcance, como indica el documento: la devolución. Con Open Payments un reembolso solo se registra (`manual_…`), no mueve dinero.
+- Sin probar contra la red real: faltan credenciales (`OP_*`) y dos wallets de `wallet.interledger-test.dev`.
+
 ## No hecho
 
-- Proveedor de pago real (hoy `placeholder`), liquidación al seller y conciliación. Falta definir quién absorbe la comisión.
+- Liquidación al seller y conciliación. Falta definir quién absorbe la comisión.
 - Notificaciones, auditoría, variantes de ítem, importación CSV, aviso de stock bajo, eliminar cuenta (todo "Posterior").
 - Imágenes en un bucket (hoy disco local), almacén de rate limit compartido (hoy en memoria; con varias instancias hace falta Redis).
 - Envío real con Resend: nunca se probó con una API key real.

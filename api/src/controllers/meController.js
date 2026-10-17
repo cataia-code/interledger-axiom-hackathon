@@ -1,12 +1,13 @@
 import { updateProfile } from '../services/profileService.js';
 
-const present = ({ id, email, name, role, emailVerified, phone }) => ({
+const present = ({ id, email, name, role, emailVerified, phone, country }) => ({
   id: Number(id),
   email,
   name,
   role,
   emailVerified,
   phone: phone ?? null,
+  country: country ?? null,
 });
 
 export function getMe(req, res) {

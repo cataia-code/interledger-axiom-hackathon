@@ -46,11 +46,11 @@ Rutas genéricas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`): `{ "mes
 
 Cada rol tiene sus propias rutas. Un login solo acepta cuentas de su rol (si no, 403 `WRONG_ROLE`). No se puede enviar el rol desde el cliente: lo fija la ruta de registro.
 
-Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
+Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified", "country" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
-| POST | `/auth/buyer/sign-up` | `{email, password(≥8), name}` | 201. Envía código de verificación al correo (verificar es opcional) |
+| POST | `/auth/buyer/sign-up` | `{email, password(≥8), name, country?}` | 201. Envía código de verificación al correo (verificar es opcional) |
 | POST | `/auth/seller/sign-up` | ver abajo | 201. Crea usuario + organización + sucursal en un paso |
 | POST | `/auth/buyer/sign-in` · `/auth/seller/sign-in` | `{email, password}` | 200 |
 | POST | `/auth/buyer/sign-in/otp` · `/auth/seller/sign-in/otp` | `{email, otp}` | Login con código de 6 dígitos. No crea cuentas |
@@ -59,16 +59,18 @@ Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name"
 | POST | `/auth/email-otp/request-password-reset` | `{email}` | Envía código |
 | POST | `/auth/email-otp/reset-password` | `{email, otp, password}` | Cambia contraseña y revoca sesiones previas |
 | POST | `/auth/sign-out` | `{}` + Bearer | Revoca el token |
-| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone}}` |
-| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null)}` | |
+| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone,country}}` |
+| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null), country?(ISO 2 letras \| null)}` | 400 `INVALID_COUNTRY` si no es un código válido |
 
 Códigos OTP: 6 dígitos, caducan en 10 min, 3 intentos. Los códigos nuevos invalidan el anterior.
+
+**País de origen del usuario (`country`):** código ISO 3166-1 de 2 letras (`CO`, `PA`, `MX`…), opcional al registrarse (comprador o vendedor), se guarda en mayúsculas y se devuelve como `user.country` (`null` si no se dio). Un valor inválido responde 400 `INVALID_COUNTRY` y **no crea la cuenta**. Se puede cambiar o borrar con `PATCH /me`. En el vendedor es independiente de `organization.country` (país legal de la organización).
 
 **Body de `seller/sign-up`:**
 
 ```json
 {
-  "email": "luna@ejemplo.com", "password": "Password-12345", "name": "Luna",
+  "email": "luna@ejemplo.com", "password": "Password-12345", "name": "Luna", "country": "PA",
   "organization": {
     "legalName": "Panadería Luna S.A.", "tradeName": "Luna (opcional)",
     "taxId": "8-123-456", "legalId": "RM-2024-001",
@@ -107,7 +109,10 @@ Item = {
   images: [{ id, url, width, height, position }],   // url relativa al host
   createdAt
 }
-PublicStore = { id, name, description, city, address, latitude, longitude, currency, status }
+PublicStore = { id, name, description, city, address, latitude, longitude, currency, status,
+  bannerUrl,   // imagen de portada 1600×600 (WebP) o null
+  iconUrl }    // icono circular 256×256 con transparencia (úsalo como pin del mapa) o null
+// Las URLs son relativas al host: <host>/uploads/…
 Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 ```
 
@@ -127,6 +132,8 @@ Category    = { id, storeId, parentId, name, slug }   // árbol vía parentId
 | POST | `/orders/:id/cancel` | Cancela (pendiente o pagado), libera/devuelve stock y reembolsa |
 | POST | `/orders/:id/pay` | Header `Idempotency-Key`. 201/200. 409 `ORDER_NOT_PAYABLE` |
 | GET | `/orders/:id/payments` | `{payments:[Payment]}` con reembolsos |
+| GET/POST | `/me/wallets` | Lista / vincula wallets de Open Payments: `POST {address, name?, primary?}` (URL o `$host/ruta`; `name` es el apodo que el usuario le pone, máx. 60; la primera queda como principal; máx. 10) |
+| PATCH/DELETE | `/me/wallets/:id` | `PATCH {name?, primary?: true}` renombra o cambia la principal. Al borrar la principal, la más antigua pasa a serlo |
 
 ```ts
 Cart = { id, storeId, currency, lines: [{ itemId, name, sku, quantity,
@@ -147,7 +154,7 @@ Payment = { id, orderId, provider, providerRef, status, amount, currency, create
 
 1. `GET /stores` → elegir tienda → `GET /items?storeId=X` (o `GET /items` para búsqueda global) → `PUT /cart/items/:id` (varias veces) → `GET /cart`.
 2. `POST /orders` (con `Idempotency-Key`): congela precios y **reserva el stock 15 min** (`expiresAt`).
-3. `POST /orders/:id/pay` (con otra `Idempotency-Key`). El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
+3. `POST /orders/:id/pay` (con otra `Idempotency-Key`; con Open Payments puedes mandar `{walletId}` para pagar con otra wallet del comprador, si no usa la principal). Con `PAYMENT_PROVIDER=openpayments` la respuesta trae `checkout` (`receive`, `debit`, `fee`, `expiresAt`, `redirectUrl`): muéstralo, deja que el comprador acepte y abre `redirectUrl` completa (no la cortes en el `&`). La wallet vuelve al backend, que redirige a `FRONTEND_URL?payment=paid|failed|denied&order=ID`; confirma con `GET /orders/:id`. Si `expiresAt` pasó, repite `POST /pay` y se cotiza de nuevo. Lo siguiente describe el modo placeholder. El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
 4. Si no se paga en 15 min el pedido se cancela solo y se libera el stock.
 
 ### Estados del pedido
@@ -164,6 +171,9 @@ Todo se limita a la sucursal del vendedor (1 sucursal por organización). Lo aje
 | Método | Ruta | Notas |
 |---|---|---|
 | GET/PATCH | `/seller/organization` | PATCH: `legalName, tradeName, legalAddress, phone`. `taxId, legalId, country` son inmutables |
+| PUT | `/seller/store/banner` | `multipart/form-data`, campo **`image`** (JPEG/PNG/WebP ≤5 MB). Se recorta a 1600×600. Reemplaza el anterior. → `{store}` |
+| PUT | `/seller/store/icon` | Igual; se recorta a un círculo de 256×256 con fondo transparente |
+| DELETE | `/seller/store/banner` · `/seller/store/icon` | Quita la imagen. → `{store}` |
 | GET/PATCH | `/seller/store` | PATCH: nombre, descripción, dirección, ciudad, teléfono, lat/lon, `status` (`active`\|`paused`) |
 | DELETE | `/seller/store` | Cierra la sucursal (borrado lógico); el vendedor ya no podrá iniciar sesión (`STORE_REQUIRED`) |
 

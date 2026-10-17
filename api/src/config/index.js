@@ -39,9 +39,27 @@ export const config = {
   mailFrom: process.env.MAIL_FROM ?? 'Axiom <onboarding@resend.dev>',
   roleAuthRateLimitMax: process.env.NODE_ENV === 'test' ? 1000 : 5,
   uploadDir: process.env.UPLOAD_DIR ?? (process.env.NODE_ENV === 'test' ? path.join(os.tmpdir(), 'axiom-uploads-test') : path.resolve('uploads')),
+  // Bucket compatible con S3 (Railway Bucket). Sin S3_BUCKET las imágenes van a UPLOAD_DIR.
+  s3: process.env.S3_BUCKET
+    ? {
+        bucket: process.env.S3_BUCKET,
+        endpoint: process.env.S3_ENDPOINT,
+        region: process.env.S3_REGION ?? 'auto',
+        accessKeyId: process.env.S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+      }
+    : null,
   reservationTtlMinutes: Number(process.env.RESERVATION_TTL_MINUTES) || 15,
   commissionRate: Number(process.env.COMMISSION_RATE ?? 0.001), // 0.1 %
-  paymentProvider: 'placeholder',
+  paymentProvider: process.env.PAYMENT_PROVIDER ?? 'placeholder', // placeholder | openpayments
+  // Identidad de la app ante Open Payments (no es la wallet de un usuario). La llave puede ir como PEM, en base64 o como ruta.
+  opClientWalletAddress: process.env.OP_CLIENT_WALLET_ADDRESS,
+  opKeyId: process.env.OP_KEY_ID,
+  opPrivateKey: process.env.OP_PRIVATE_KEY,
+  opPrivateKeyPath: process.env.OP_PRIVATE_KEY_PATH,
+  publicApiUrl: (process.env.PUBLIC_API_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, ''),
+  frontendUrl: process.env.FRONTEND_URL?.replace(/\/$/, ''), // al volver de la wallet se redirige aquí; vacío = responde JSON
   paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? (process.env.NODE_ENV === 'production' ? undefined : 'dev-placeholder-secret'),
   authUrl: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
 };

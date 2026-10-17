@@ -1,30 +1,32 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { and, asc, eq, sql } from 'drizzle-orm';
 import sharp from 'sharp';
-import { config } from '../config/index.js';
 import { db } from '../db/index.js';
 import { itemImage } from '../db/catalog.js';
+import { store } from '../db/business.js';
+import { storage } from '../storage/index.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { bad, object, parseId } from './validation.js';
 import { findOwnItem } from './itemService.js';
 
-// Todas las imágenes se guardan como WebP cuadrado de tamaño fijo; no se conserva el original.
+// Las imágenes se guardan como WebP de tamaño fijo; no se conserva el original.
+// Ítems: cuadrado 1024. Tienda: banner 1600×600 e icono circular de 256 (con transparencia, listo como pin de mapa).
 export const IMAGE_SIZE = 1024;
+export const BANNER_SIZE = { width: 1600, height: 600 };
+export const ICON_SIZE = 256;
+export const STORE_IMAGE_KINDS = { banner: 'bannerPath', icon: 'iconPath' };
 export const MAX_IMAGES_PER_ITEM = 8;
 export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-const absolute = (relative) => path.join(config.uploadDir, relative);
-
-async function normalize(buffer) {
+async function normalize(buffer, { width = IMAGE_SIZE, height = IMAGE_SIZE, circle = false } = {}) {
   try {
-    return await sharp(buffer, { limitInputPixels: 50_000_000 })
-      .rotate()
-      .resize(IMAGE_SIZE, IMAGE_SIZE, { fit: 'cover' })
-      .webp({ quality: 80 })
-      .toBuffer({ resolveWithObject: true });
+    let image = sharp(buffer, { limitInputPixels: 50_000_000 }).rotate().resize(width, height, { fit: 'cover' });
+    if (circle) {
+      const mask = Buffer.from(`<svg width="${width}" height="${height}"><circle cx="${width / 2}" cy="${height / 2}" r="${width / 2}"/></svg>`);
+      image = sharp(await image.png().toBuffer()).composite([{ input: mask, blend: 'dest-in' }]);
+    }
+    return await image.webp({ quality: 80 }).toBuffer({ resolveWithObject: true });
   } catch {
     throw bad('The file is not a valid image', 'INVALID_IMAGE');
   }
@@ -36,9 +38,8 @@ export async function addImage(storeId, idParam, file) {
   const item = await findOwnItem(storeId, idParam);
   if (!file) throw bad('Send the image in the "image" field (multipart/form-data)', 'IMAGE_REQUIRED');
   const { data, info } = await normalize(file.buffer);
-  const relative = path.join('items', String(item.id), `${randomUUID()}.webp`);
-  await mkdir(path.dirname(absolute(relative)), { recursive: true });
-  await writeFile(absolute(relative), data);
+  const key = `items/${item.id}/${randomUUID()}.webp`;
+  await storage.put(key, data, 'image/webp');
   try {
     return await db.transaction(async (tx) => {
       await tx.execute(sql`select id from item where id = ${item.id} for update`);
@@ -47,12 +48,12 @@ export async function addImage(storeId, idParam, file) {
       const position = existing.reduce((max, i) => Math.max(max, i.position), 0) + 1;
       const [row] = await tx
         .insert(itemImage)
-        .values({ itemId: item.id, path: relative.split(path.sep).join('/'), width: info.width, height: info.height, sizeBytes: info.size, position })
+        .values({ itemId: item.id, path: key, width: info.width, height: info.height, sizeBytes: info.size, position })
         .returning();
       return row;
     });
   } catch (err) {
-    await rm(absolute(relative), { force: true });
+    await storage.remove(key);
     throw err;
   }
 }
@@ -62,7 +63,7 @@ export async function deleteImage(storeId, idParam, imageParam) {
   const imageId = parseId(imageParam, 'Image not found', 'IMAGE_NOT_FOUND');
   const [row] = await db.delete(itemImage).where(and(eq(itemImage.id, imageId), eq(itemImage.itemId, item.id))).returning();
   if (!row) throw new HttpError(404, 'Image not found', 'IMAGE_NOT_FOUND');
-  await rm(absolute(row.path), { force: true });
+  await storage.remove(row.path);
   await repack(item.id);
 }
 
@@ -85,4 +86,29 @@ export async function reorderImages(storeId, idParam, body) {
   if (!valid) throw bad('ids must list every image of the item exactly once', 'INVALID_IMAGE_ORDER');
   await setOrder(ids);
   return imagesOf(item.id);
+}
+
+// ---------- imágenes de la tienda (banner e icono) ----------
+// Reemplaza la imagen anterior: sube la nueva, actualiza la fila y borra la vieja.
+export async function setStoreImage(storeRow, kind, file) {
+  const column = STORE_IMAGE_KINDS[kind];
+  if (!file) throw bad('Send the image in the "image" field (multipart/form-data)', 'IMAGE_REQUIRED');
+  const { data } = await normalize(file.buffer, kind === 'banner' ? BANNER_SIZE : { width: ICON_SIZE, height: ICON_SIZE, circle: true });
+  const key = `stores/${storeRow.id}/${kind}-${randomUUID()}.webp`;
+  await storage.put(key, data, 'image/webp');
+  try {
+    const [row] = await db.update(store).set({ [column]: key }).where(eq(store.id, storeRow.id)).returning();
+    if (storeRow[column]) await storage.remove(storeRow[column]);
+    return row;
+  } catch (err) {
+    await storage.remove(key);
+    throw err;
+  }
+}
+
+export async function removeStoreImage(storeRow, kind) {
+  const column = STORE_IMAGE_KINDS[kind];
+  const [row] = await db.update(store).set({ [column]: null }).where(eq(store.id, storeRow.id)).returning();
+  if (storeRow[column]) await storage.remove(storeRow[column]);
+  return row;
 }

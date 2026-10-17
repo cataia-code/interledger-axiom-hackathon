@@ -7,12 +7,12 @@ const GROUPS = {
     ['GET', '/api/v1/ping'],
   ],
   'Auth comprador': [
-    ['POST', '/api/v1/auth/buyer/sign-up', { name: '', email: '', password: '' }],
+    ['POST', '/api/v1/auth/buyer/sign-up', { name: '', email: '', password: '', country: 'CO' }],
     ['POST', '/api/v1/auth/buyer/sign-in', { email: '', password: '' }],
     ['POST', '/api/v1/auth/buyer/sign-in/otp', { email: '', otp: '' }],
   ],
   'Auth vendedor': [
-    ['POST', '/api/v1/auth/seller/sign-up', { name: '', email: '', password: '' }],
+    ['POST', '/api/v1/auth/seller/sign-up', { name: '', email: '', password: '', country: 'CO' }],
     ['POST', '/api/v1/auth/seller/sign-in', { email: '', password: '' }],
     ['POST', '/api/v1/auth/seller/sign-in/otp', { email: '', otp: '' }],
   ],
@@ -26,7 +26,7 @@ const GROUPS = {
   ],
   Cuenta: [
     ['GET', '/api/v1/me'],
-    ['PATCH', '/api/v1/me', {}],
+    ['PATCH', '/api/v1/me', { name: '', phone: '', country: 'CO' }],
   ],
   'Comprador (token)': [
     ['GET', '/api/v1/cart'],
@@ -43,6 +43,8 @@ const GROUPS = {
   'Vendedor (token)': [
     ['GET', '/api/v1/seller/organization'],
     ['GET', '/api/v1/seller/store'],
+    ['DELETE', '/api/v1/seller/store/banner'],
+    ['DELETE', '/api/v1/seller/store/icon'],
     ['GET', '/api/v1/seller/orders'],
     ['GET', '/api/v1/seller/orders/:id'],
     ['POST', '/api/v1/seller/orders/:id/status', {}],
