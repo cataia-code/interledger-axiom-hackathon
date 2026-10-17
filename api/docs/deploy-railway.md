@@ -34,6 +34,21 @@ Para el correo (códigos de acceso): `RESEND_API_KEY` y `MAIL_FROM`, ver la secc
 
 **Servicio Postgres:** plantilla de PostgreSQL de Railway con su volumen. La extensión `pg_trgm` la crea la migración `0006`.
 
+## Pagos con Open Payments
+
+Por defecto `PAYMENT_PROVIDER=placeholder` (simulado). Para usar la red de pruebas de Interledger:
+
+| Variable | Valor |
+|---|---|
+| `PAYMENT_PROVIDER` | `openpayments` |
+| `OP_CLIENT_WALLET_ADDRESS` | wallet de la app en `wallet.interledger-test.dev` |
+| `OP_KEY_ID` | key ID de Developer Keys |
+| `OP_PRIVATE_KEY` | contenido de `private.key`: el PEM completo, el PEM en base64 o solo el cuerpo base64 sin las líneas BEGIN/END, todo en una línea; pégalo tú, no se sube al repo |
+| `PUBLIC_API_URL` | URL pública de la API sin `/api/v1`, por ejemplo `https://${{RAILWAY_PUBLIC_DOMAIN}}` (a donde vuelve la wallet). Si falta, se usa `BETTER_AUTH_URL` |
+| `FRONTEND_URL` | URL del front (opcional; sin ella el retorno responde JSON) |
+
+La llave pública debe estar publicada en `{OP_CLIENT_WALLET_ADDRESS}/jwks.json`. Con este proveedor el webhook del placeholder responde 404.
+
 ## Correo (códigos de acceso)
 La API envía por correo los códigos de inicio de sesión, verificación y recuperación de contraseña (`src/mail/index.js`). En producción elige el proveedor así: `MAIL_PROVIDER` (`brevo`, `mailjet` o `resend`) si está definida; si no, el primero con credenciales: **Brevo** (`BREVO_API_KEY`), **Mailjet** (`MAILJET_API_KEY` y `MAILJET_SECRET_KEY`) o **Resend** (`RESEND_API_KEY`). Sin ninguno **no se entregan correos**: el arranque lo avisa en el log y los códigos no se imprimen.
 

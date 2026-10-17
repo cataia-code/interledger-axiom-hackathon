@@ -41,7 +41,14 @@ export const config = {
   uploadDir: process.env.UPLOAD_DIR ?? (process.env.NODE_ENV === 'test' ? path.join(os.tmpdir(), 'axiom-uploads-test') : path.resolve('uploads')),
   reservationTtlMinutes: Number(process.env.RESERVATION_TTL_MINUTES) || 15,
   commissionRate: Number(process.env.COMMISSION_RATE ?? 0.001), // 0.1 %
-  paymentProvider: 'placeholder',
+  paymentProvider: process.env.PAYMENT_PROVIDER ?? 'placeholder', // placeholder | openpayments
+  // Identidad de la app ante Open Payments (no es la wallet de un usuario). La llave puede ir como PEM, en base64 o como ruta.
+  opClientWalletAddress: process.env.OP_CLIENT_WALLET_ADDRESS,
+  opKeyId: process.env.OP_KEY_ID,
+  opPrivateKey: process.env.OP_PRIVATE_KEY,
+  opPrivateKeyPath: process.env.OP_PRIVATE_KEY_PATH,
+  publicApiUrl: (process.env.PUBLIC_API_URL ?? process.env.BETTER_AUTH_URL ?? 'http://localhost:3000').replace(/\/$/, ''),
+  frontendUrl: process.env.FRONTEND_URL?.replace(/\/$/, ''), // al volver de la wallet se redirige aquí; vacío = responde JSON
   paymentWebhookSecret: process.env.PAYMENT_WEBHOOK_SECRET ?? (process.env.NODE_ENV === 'production' ? undefined : 'dev-placeholder-secret'),
   authUrl: process.env.BETTER_AUTH_URL ?? 'http://localhost:3000',
 };
