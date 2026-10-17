@@ -89,6 +89,7 @@ Límites: `legalName` 2-120, `taxId`/`legalId` 3-40 (únicos), `country` 2 letra
 
 | Método | Ruta | Notas |
 |---|---|---|
+| GET | `/stores` | Listado de tiendas **activas** (las pausadas/cerradas no salen), de la más nueva a la más antigua. Filtros: `q` (nombre/descripción), `city`, `limit` (1-50), `cursor`. → `{stores:[PublicStore], nextCursor}` |
 | GET | `/items` | Filtros: `categoryId`, `storeId`, `q` (texto), `sort` (`newest`\|`price_asc`\|`price_desc`), `limit` (1-50), `cursor`. → `{items:[Item], nextCursor}` |
 | GET | `/items/:id` | → `{item: Item}` |
 | GET | `/stores/:id` | → `{store: PublicStore}`; 404 si está cerrada |
@@ -144,7 +145,7 @@ Payment = { id, orderId, provider, providerRef, status, amount, currency, create
 
 ### Flujo de compra
 
-1. `GET /items` → `PUT /cart/items/:id` (varias veces) → `GET /cart`.
+1. `GET /stores` → elegir tienda → `GET /items?storeId=X` (o `GET /items` para búsqueda global) → `PUT /cart/items/:id` (varias veces) → `GET /cart`.
 2. `POST /orders` (con `Idempotency-Key`): congela precios y **reserva el stock 15 min** (`expiresAt`).
 3. `POST /orders/:id/pay` (con otra `Idempotency-Key`). El pago es un **placeholder** (`provider: "placeholder"`); el cobro se confirma por webhook del servidor, así que tras pagar haz **polling** de `GET /orders/:id` hasta `status: paid`.
 4. Si no se paga en 15 min el pedido se cancela solo y se libera el stock.
