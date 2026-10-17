@@ -43,6 +43,8 @@ const GROUPS = {
   'Vendedor (token)': [
     ['GET', '/api/v1/seller/organization'],
     ['GET', '/api/v1/seller/store'],
+    ['DELETE', '/api/v1/seller/store/banner'],
+    ['DELETE', '/api/v1/seller/store/icon'],
     ['GET', '/api/v1/seller/orders'],
     ['GET', '/api/v1/seller/orders/:id'],
     ['POST', '/api/v1/seller/orders/:id/status', {}],

@@ -39,6 +39,17 @@ export const config = {
   mailFrom: process.env.MAIL_FROM ?? 'Axiom <onboarding@resend.dev>',
   roleAuthRateLimitMax: process.env.NODE_ENV === 'test' ? 1000 : 5,
   uploadDir: process.env.UPLOAD_DIR ?? (process.env.NODE_ENV === 'test' ? path.join(os.tmpdir(), 'axiom-uploads-test') : path.resolve('uploads')),
+  // Bucket compatible con S3 (Railway Bucket). Sin S3_BUCKET las imágenes van a UPLOAD_DIR.
+  s3: process.env.S3_BUCKET
+    ? {
+        bucket: process.env.S3_BUCKET,
+        endpoint: process.env.S3_ENDPOINT,
+        region: process.env.S3_REGION ?? 'auto',
+        accessKeyId: process.env.S3_ACCESS_KEY_ID,
+        secretAccessKey: process.env.S3_SECRET_ACCESS_KEY,
+        forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+      }
+    : null,
   reservationTtlMinutes: Number(process.env.RESERVATION_TTL_MINUTES) || 15,
   commissionRate: Number(process.env.COMMISSION_RATE ?? 0.001), // 0.1 %
   paymentProvider: 'placeholder',

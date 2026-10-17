@@ -130,6 +130,8 @@ export const presentOrganization = (o) => ({
   createdAt: o.createdAt,
 });
 
+const imageUrl = (key) => (key ? `/uploads/${key}` : null);
+
 export const presentPublicStore = (s) => ({
   id: s.id,
   name: s.name,
@@ -139,6 +141,8 @@ export const presentPublicStore = (s) => ({
   latitude: s.latitude,
   longitude: s.longitude,
   currency: s.currency,
+  bannerUrl: imageUrl(s.bannerPath),
+  iconUrl: imageUrl(s.iconPath),
   status: s.status,
 });
 
@@ -154,6 +158,8 @@ export const presentStore = (s) => ({
   longitude: s.longitude,
   legalId: s.legalId,
   currency: s.currency,
+  bannerUrl: imageUrl(s.bannerPath),
+  iconUrl: imageUrl(s.iconPath),
   status: s.status,
   createdAt: s.createdAt,
 });

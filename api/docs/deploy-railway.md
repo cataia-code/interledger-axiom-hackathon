@@ -1,6 +1,6 @@
 # Despliegue en Railway
 
-La API se despliega como un servicio desde GitHub (`api/Dockerfile`) con un servicio PostgreSQL y un volumen para las imágenes.
+La API se despliega como un servicio desde GitHub (`api/Dockerfile`) con un servicio PostgreSQL y un **Bucket** de Railway para las imágenes.
 
 ## Qué hace el contenedor
 `api/Dockerfile` instala solo dependencias de producción y arranca con
@@ -14,7 +14,6 @@ La API se despliega como un servicio desde GitHub (`api/Dockerfile`) con un serv
 | Root Directory | `/api` (así Railway usa `api/Dockerfile`) |
 | Networking | dominio público, puerto de destino `3000` |
 | Healthcheck Path | `/api/v1/health` |
-| Volumen | montado en `/data` (imágenes subidas) |
 
 **Variables** (las secretas se generan en Railway; ninguna vive en el repositorio):
 
@@ -28,11 +27,25 @@ La API se despliega como un servicio desde GitHub (`api/Dockerfile`) con un serv
 | `CORS_ORIGIN` | `https://${{RAILWAY_PUBLIC_DOMAIN}}` (añade aquí los orígenes de las apps web, separados por comas) |
 | `TRUST_PROXY` | `1` |
 | `PAYMENT_WEBHOOK_SECRET` | `${{secret(32)}}` |
-| `UPLOAD_DIR` | `/data/uploads` |
+| `S3_BUCKET` | `${{Bucket.BUCKET}}` |
+| `S3_ENDPOINT` | `${{Bucket.ENDPOINT}}` |
+| `S3_REGION` | `${{Bucket.REGION}}` |
+| `S3_ACCESS_KEY_ID` | `${{Bucket.ACCESS_KEY_ID}}` |
+| `S3_SECRET_ACCESS_KEY` | `${{Bucket.SECRET_ACCESS_KEY}}` |
 
 Para el correo (códigos de acceso): `RESEND_API_KEY` y `MAIL_FROM`, ver la sección *Correo con Resend*. Opcionales: `COMMISSION_RATE`, `RESERVATION_TTL_MINUTES`.
 
 **Servicio Postgres:** plantilla de PostgreSQL de Railway con su volumen. La extensión `pg_trgm` la crea la migración `0006`.
+
+## Imágenes (Bucket)
+Las imágenes (fotos de ítems, banner e icono de tienda) se guardan en un **Bucket de Railway** (compatible con S3). El bucket es privado: la API las entrega en `GET /uploads/<clave>`, así que el frontend usa siempre las URLs relativas que devuelve la API (`/uploads/...`).
+
+1. En el proyecto: *New → Bucket*.
+2. En el servicio de la API añade las variables `S3_*` de la tabla de arriba, referenciando las del bucket (`${{Bucket.…}}`, donde `Bucket` es el nombre que le diste; ajústalo). Si defines `S3_BUCKET`, la API deja de usar el disco.
+3. Redespliega. Sin `S3_BUCKET`, la API usa `UPLOAD_DIR` (disco/volumen), útil en local.
+4. Si el proveedor exige URLs con el bucket en la ruta (MinIO, etc.), pon `S3_FORCE_PATH_STYLE=true`.
+
+Las imágenes ya subidas al volumen anterior no se migran solas: vuelve a subirlas, o corre `npm run seed` contra la API para regenerar las de ejemplo.
 
 ## Correo (códigos de acceso)
 La API envía por correo los códigos de inicio de sesión, verificación y recuperación de contraseña (`src/mail/index.js`). En producción elige el proveedor así: `MAIL_PROVIDER` (`brevo`, `mailjet` o `resend`) si está definida; si no, el primero con credenciales: **Brevo** (`BREVO_API_KEY`), **Mailjet** (`MAILJET_API_KEY` y `MAILJET_SECRET_KEY`) o **Resend** (`RESEND_API_KEY`). Sin ninguno **no se entregan correos**: el arranque lo avisa en el log y los códigos no se imprimen.
@@ -75,6 +88,6 @@ Si el health responde pero las rutas fallan, revisa en los logs que aparezca `[d
 
 ## Notas
 - Railway marca la configuración como código (`railway.json`) como obsoleta, por eso los ajustes viven en el panel y el comportamiento de arranque va en el `Dockerfile`.
-- Las imágenes quedan en el volumen: sobreviven a los redespliegues, pero el servicio no puede tener más de una réplica. Para escalar horizontalmente hay que moverlas a un almacenamiento de objetos.
+- Las imágenes viven en el bucket, así que el servicio puede tener varias réplicas.
 - El rate limit está en memoria (una instancia). Con varias réplicas hace falta un almacén compartido.
 - Para ejecutar el webhook de pagos simulado: `POST /api/v1/payments/webhook/placeholder` con la cabecera `X-Webhook-Secret` (el valor de `PAYMENT_WEBHOOK_SECRET`, visible en el panel de Railway).

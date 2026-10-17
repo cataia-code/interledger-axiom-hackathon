@@ -9,6 +9,7 @@ import { config } from './config/index.js';
 import routes from './routes/index.js';
 import { HttpError, notFound, errorHandler } from './middlewares/errorHandler.js';
 import { createRoleAuthRouter } from './routes/roleAuth.js';
+import { serveUpload } from './storage/serve.js';
 
 const publicDir = fileURLToPath(new URL('./public', import.meta.url));
 
@@ -37,11 +38,8 @@ export function createApp() {
   // Probador web de la API (mismo origen, no requiere CORS): /demo.html
   app.use(express.static(publicDir));
 
-  // Imágenes subidas (disco local del servidor).
-  app.use('/uploads', (req, res, next) => {
-    res.set('Cross-Origin-Resource-Policy', 'cross-origin');
-    next();
-  }, express.static(config.uploadDir, { fallthrough: false, maxAge: '7d', immutable: true }));
+  // Imágenes subidas: se sirven desde el almacén configurado (bucket S3 o disco).
+  app.get('/uploads/*splat', serveUpload);
 
   app.use('/api/v1', routes);
 

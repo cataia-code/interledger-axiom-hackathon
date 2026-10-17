@@ -1,22 +1,52 @@
 // Carga datos de ejemplo usando la propia API (sirve contra local o Railway).
 // Uso: API_URL=https://<host> npm run seed   (por defecto http://localhost:3000)
+// Por defecto carga 3 tiendas con 5 ítems cada una; SEED_STORES (máx. 6) y SEED_ITEMS (máx. 8) lo ajustan.
+import sharp from 'sharp';
+
 const BASE = `${process.env.API_URL ?? 'http://localhost:3000'}/api/v1`;
 const PASSWORD = 'Password-12345';
 
-async function call(method, path, { token, body } = {}) {
+// `form` (FormData) sube archivos; `body` se envía como JSON.
+async function call(method, path, { token, body, form } = {}) {
   const res = await fetch(`${BASE}${path}`, {
     method,
     headers: { ...(body && { 'Content-Type': 'application/json' }), ...(token && { Authorization: `Bearer ${token}` }) },
-    body: body && JSON.stringify(body),
+    body: form ?? (body && JSON.stringify(body)),
   });
   if (res.status === 429) {
     // Registro e inicio de sesión admiten 5 intentos por minuto y ruta: esperamos y reintentamos.
     console.log('… límite de peticiones, esperando 62 s');
     await new Promise((r) => setTimeout(r, 62_000));
-    return call(method, path, { token, body });
+    return call(method, path, { token, body, form });
   }
   const text = await res.text();
   return { status: res.status, data: text ? JSON.parse(text) : null };
+}
+
+// ---- imágenes de relleno (generadas, no hay fotos reales) ----
+const esc = (t) => t.replace(/&/g, '&amp;').replace(/</g, '&lt;');
+const wrap = (text, max) => {
+  const lines = [];
+  for (const word of text.split(' ')) {
+    if (lines.length && `${lines.at(-1)} ${word}`.length <= max) lines[lines.length - 1] += ` ${word}`;
+    else lines.push(word);
+  }
+  return lines;
+};
+function placeholder(width, height, [c1, c2], title, subtitle = '') {
+  const size = Math.round(Math.min(width, height) / (width > height * 2 ? 6 : 9));
+  const lines = wrap(title, width > height * 2 ? 28 : 14);
+  const y0 = height / 2 - ((lines.length - 1) * size * 1.2) / 2;
+  const text = lines.map((l, i) => `<text x="50%" y="${y0 + i * size * 1.2}" font-size="${size}" font-weight="700" text-anchor="middle" fill="#fff" font-family="Helvetica, Arial, sans-serif">${esc(l)}</text>`).join('');
+  const sub = subtitle ? `<text x="50%" y="${height - size}" font-size="${Math.round(size * 0.55)}" text-anchor="middle" fill="#ffffffcc" font-family="Helvetica, Arial, sans-serif">${esc(subtitle)}</text>` : '';
+  return sharp(Buffer.from(`<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${c1}"/><stop offset="1" stop-color="${c2}"/></linearGradient></defs><rect width="100%" height="100%" fill="url(#g)"/>${text}${sub}</svg>`)).png().toBuffer();
+}
+const initials = (name) => name.split(' ').filter((w) => w.length > 2).slice(0, 2).map((w) => w[0]).join('').toUpperCase();
+async function upload(method, path, token, png) {
+  const form = new FormData();
+  form.append('image', new Blob([png], { type: 'image/png' }), 'seed.png');
+  const r = await call(method, path, { token, form });
+  if (r.status >= 300) throw new Error(`${method} ${path} ${r.status}: ${JSON.stringify(r.data)}`);
 }
 
 // Registra la cuenta; si ya existe (422), inicia sesión. Devuelve el token.
@@ -40,6 +70,8 @@ const org = (n, legalName, tradeName) => ({
 });
 
 // items: [sku, nombre, descripción, precio COP, categoría, stock, descuento?]
+const PALETTES = [['#c2410c', '#f59e0b'], ['#4b2e1e', '#a16207'], ['#15803d', '#84cc16'], ['#1d4ed8', '#7c3aed'], ['#b45309', '#dc2626'], ['#be185d', '#16a34a']];
+
 const SELLERS = [
   {
     email: 'panaderia.poblado@example.com', name: 'Camila Restrepo',
@@ -139,7 +171,11 @@ const SELLERS = [
   },
 ];
 
-for (const s of SELLERS) {
+const STORES = Math.min(Number(process.env.SEED_STORES) || 3, SELLERS.length);
+const ITEMS = Math.min(Number(process.env.SEED_ITEMS) || 5, 8);
+
+for (const [index, s] of SELLERS.slice(0, STORES).entries()) {
+  const palette = PALETTES[index % PALETTES.length];
   const token = await account('seller', { email: s.email, password: PASSWORD, name: s.name, organization: s.organization, store: s.store });
   const existing = await call('GET', '/seller/categories', { token });
   const catIds = new Map(existing.data.categories.map((c) => [c.name, c.id]));
@@ -148,16 +184,34 @@ for (const s of SELLERS) {
     const r = await call('POST', '/seller/categories', { token, body: { name } });
     catIds.set(name, r.data.category.id);
   }
-  for (const [sku, name, description, priceAmount, cat, initialStock, discount] of s.items) {
-    const r = await call('POST', '/seller/items', {
-      token, body: { sku, name, description, priceAmount: COP(priceAmount), categoryId: catIds.get(cat), status: 'active', initialStock },
-    });
-    if (r.status === 409) { console.log(`= ${sku} ya existe`); continue; }
-    if (r.status !== 201) throw new Error(`item ${sku} ${r.status}: ${JSON.stringify(r.data)}`);
-    if (discount) await call('POST', `/seller/items/${r.data.item.id}/discounts`, { token, body: discount.type === 'fixed' ? { ...discount, value: COP(discount.value) } : discount });
-    console.log(`+ ${sku} ${name}`);
+
+  // Banner e icono de la tienda (solo si faltan).
+  const mine = (await call('GET', '/seller/store', { token })).data.store;
+  if (!mine.bannerUrl) await upload('PUT', '/seller/store/banner', token, await placeholder(1600, 600, palette, s.store.name, 'Medellín, Colombia'));
+  if (!mine.iconUrl) await upload('PUT', '/seller/store/icon', token, await placeholder(256, 256, palette, initials(s.store.name)));
+
+  // Ítems existentes por SKU, para no duplicar ni repetir imágenes.
+  const owned = new Map((await call('GET', '/seller/items?limit=50', { token })).data.items.map((i) => [i.sku, i]));
+  for (const [sku, name, description, priceAmount, cat, initialStock, discount] of s.items.slice(0, ITEMS)) {
+    let item = owned.get(sku);
+    if (item) {
+      console.log(`= ${sku} ya existe`);
+    } else {
+      const r = await call('POST', '/seller/items', {
+        token, body: { sku, name, description, priceAmount: COP(priceAmount), categoryId: catIds.get(cat), status: 'active', initialStock },
+      });
+      if (r.status !== 201) throw new Error(`item ${sku} ${r.status}: ${JSON.stringify(r.data)}`);
+      item = r.data.item;
+      if (discount) await call('POST', `/seller/items/${item.id}/discounts`, { token, body: discount.type === 'fixed' ? { ...discount, value: COP(discount.value) } : discount });
+      console.log(`+ ${sku} ${name}`);
+    }
+    // 3 imágenes por producto, con un degradado distinto cada una.
+    for (let n = (item.images ?? []).length + 1; n <= 3; n++) {
+      const shifted = palette.map((c, k) => (n % 2 === 0 ? palette[1 - k] : c));
+      await upload('POST', `/seller/items/${item.id}/images`, token, await placeholder(1024, 1024, shifted, name, `${s.store.name} · ${n}/3`));
+    }
   }
 }
 
 await account('buyer', { email: 'comprador@example.com', password: PASSWORD, name: 'Compradora Demo' });
-console.log(`\nVendedores: ${SELLERS.map((x) => x.email).join(', ')}\nListo en ${BASE}\nCuentas (contraseña ${PASSWORD}): los vendedores (uno por tienda) y comprador@example.com (comprador)`);
+console.log(`\nVendedores: ${SELLERS.slice(0, STORES).map((x) => x.email).join(', ')}\nListo en ${BASE}\nCuentas (contraseña ${PASSWORD}): los vendedores (uno por tienda) y comprador@example.com (comprador)`);
