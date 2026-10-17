@@ -21,6 +21,7 @@ export const user = pgTable("user", {
     .notNull(),
   role: text("role").default("buyer").notNull(),
   phone: text("phone"),
+  country: text("country"),
 });
 
 export const session = pgTable(

@@ -7,12 +7,12 @@ const GROUPS = {
     ['GET', '/api/v1/ping'],
   ],
   'Auth comprador': [
-    ['POST', '/api/v1/auth/buyer/sign-up', { name: '', email: '', password: '' }],
+    ['POST', '/api/v1/auth/buyer/sign-up', { name: '', email: '', password: '', country: 'CO' }],
     ['POST', '/api/v1/auth/buyer/sign-in', { email: '', password: '' }],
     ['POST', '/api/v1/auth/buyer/sign-in/otp', { email: '', otp: '' }],
   ],
   'Auth vendedor': [
-    ['POST', '/api/v1/auth/seller/sign-up', { name: '', email: '', password: '' }],
+    ['POST', '/api/v1/auth/seller/sign-up', { name: '', email: '', password: '', country: 'CO' }],
     ['POST', '/api/v1/auth/seller/sign-in', { email: '', password: '' }],
     ['POST', '/api/v1/auth/seller/sign-in/otp', { email: '', otp: '' }],
   ],
@@ -26,7 +26,7 @@ const GROUPS = {
   ],
   Cuenta: [
     ['GET', '/api/v1/me'],
-    ['PATCH', '/api/v1/me', {}],
+    ['PATCH', '/api/v1/me', { name: '', phone: '', country: 'CO' }],
   ],
   'Comprador (token)': [
     ['GET', '/api/v1/cart'],

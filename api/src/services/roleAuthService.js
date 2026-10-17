@@ -5,6 +5,7 @@ import { db } from '../db/index.js';
 import { session, user } from '../db/schema.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { validateOrganizationInput, validateStoreInput } from './storeService.js';
+import { countryCode } from './validation.js';
 import { createSellerOrganization, presentOrganization, presentStore, sellerStatus } from './sellerService.js';
 
 // Traduce los errores de Better Auth al formato de errores de la API.
@@ -19,7 +20,15 @@ async function callAuth(fn) {
   }
 }
 
-const publicUser = ({ id, email, name, role, emailVerified }) => ({ id: Number(id), email, name, role, emailVerified });
+const publicUser = ({ id, email, name, role, emailVerified, country }) => ({ id: Number(id), email, name, role, emailVerified, country: country ?? null });
+
+// country es opcional al registrarse; si viene, debe ser un código ISO válido.
+const optionalCountry = (value) => (value == null || value === '' ? null : countryCode(value, 'country'));
+
+// Better Auth no deja que el cliente fije campos propios, así que el país se guarda después de crear la cuenta.
+async function saveCountry(userId, country) {
+  if (country) await db.update(user).set({ country }).where(eq(user.id, Number(userId)));
+}
 
 async function revokeSession(token) {
   await db.delete(session).where(eq(session.token, token));
@@ -44,21 +53,25 @@ async function enforceRole(result, role) {
   return { token: result.token, user: publicUser(result.user) };
 }
 
-export async function signUpBuyer({ email, password, name }) {
+export async function signUpBuyer({ email, password, name, country }) {
+  const countryInput = optionalCountry(country);
   const result = await callAuth(() => auth.api.signUpEmail({ body: { email, password, name } }));
-  return { token: result.token, user: publicUser(result.user) };
+  await saveCountry(result.user.id, countryInput);
+  return { token: result.token, user: publicUser({ ...result.user, country: countryInput }) };
 }
 
 // Crea usuario, organización y primera sucursal juntos: nunca queda un seller sin ellas.
-export async function signUpSeller({ email, password, name, organization: orgBody, store: storeBody }) {
+export async function signUpSeller({ email, password, name, country, organization: orgBody, store: storeBody }) {
+  const countryInput = optionalCountry(country);
   const orgInput = validateOrganizationInput(orgBody); // se valida todo antes de crear nada
   const storeInput = validateStoreInput(storeBody);
   const result = await callAuth(() => auth.api.signUpEmail({ body: { email, password, name } }));
   try {
+    await saveCountry(result.user.id, countryInput);
     const created = await createSellerOrganization(result.user.id, orgInput, storeInput);
     return {
       token: result.token,
-      user: publicUser({ ...result.user, role: 'seller' }),
+      user: publicUser({ ...result.user, role: 'seller', country: countryInput }),
       organization: presentOrganization(created.organization),
       store: presentStore(created.store),
     };
