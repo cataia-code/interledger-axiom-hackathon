@@ -7,8 +7,9 @@ import * as catalogSchema from './catalog.js';
 import * as inventorySchema from './inventory.js';
 import * as ordersSchema from './orders.js';
 import * as paymentsSchema from './payments.js';
+import * as couponsSchema from './coupons.js';
 
-const schema = { ...authSchema, ...businessSchema, ...catalogSchema, ...inventorySchema, ...ordersSchema, ...paymentsSchema };
+const schema = { ...authSchema, ...businessSchema, ...catalogSchema, ...inventorySchema, ...ordersSchema, ...paymentsSchema, ...couponsSchema };
 
 export const pool = new pg.Pool({ connectionString: config.databaseUrl });
 

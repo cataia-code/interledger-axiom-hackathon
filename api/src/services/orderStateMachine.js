@@ -2,6 +2,7 @@ import { eq, sql } from 'drizzle-orm';
 import { order, orderStatusHistory } from '../db/orders.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { settlePaymentsOnCancel } from './paymentCore.js';
+import { releaseRedemption } from './couponEngine.js';
 import { confirmReservations, releaseReservations, restockOrder } from './stockService.js';
 
 export const ORDER_STATUSES = ['pending_payment', 'paid', 'preparing', 'completed', 'cancelled', 'refunded'];
@@ -32,6 +33,7 @@ export async function transitionOrder(tx, orderId, to, { actor, actorId = null, 
     if (from === 'pending_payment') await releaseReservations(tx, orderId);
     else await restockOrder(tx, orderId, 'Pedido cancelado');
     await settlePaymentsOnCancel(tx, orderId, note ?? 'Pedido cancelado');
+    await releaseRedemption(tx, orderId);
   }
   const [row] = await tx.update(order).set({ status: to }).where(eq(order.id, orderId)).returning();
   await tx.insert(orderStatusHistory).values({ orderId, fromStatus: from, toStatus: to, actorId, note });
