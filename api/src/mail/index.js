@@ -54,18 +54,56 @@ export function createBrevoTransport({ apiKey, from, fetchImpl = fetch }) {
   };
 }
 
-// Elige el transport: MAIL_PROVIDER manda; si no, Brevo con BREVO_API_KEY, luego Resend con RESEND_API_KEY, y si no, consola.
-export function createMailer({ env = config.env, resendApiKey = config.resendApiKey, brevoApiKey = config.brevoApiKey, provider = config.mailProvider, from = config.mailFrom, client, fetchImpl } = {}) {
+// Mailjet (plan gratuito: 200 correos al día, 6 000 al mes) por su API HTTPS v3.1. Tampoco exige dominio propio:
+// basta validar el correo remitente (Account → Sender addresses). Autenticación básica con clave pública y secreta.
+export function createMailjetTransport({ apiKey, secretKey, from, fetchImpl = fetch }) {
+  const sender = parseFrom(from);
+  const auth = `Basic ${Buffer.from(`${apiKey}:${secretKey}`).toString('base64')}`;
+  return {
+    name: 'mailjet',
+    async send({ to, subject, text, html }) {
+      const res = await fetchImpl('https://api.mailjet.com/v3.1/send', {
+        method: 'POST',
+        headers: { authorization: auth, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          Messages: [{ From: { Email: sender.email, ...(sender.name && { Name: sender.name }) }, To: [{ Email: to }], Subject: subject, TextPart: text, HTMLPart: html }],
+        }),
+      });
+      const body = await res.json().catch(() => ({}));
+      const failed = body.Messages?.find((m) => m.Status && m.Status !== 'success');
+      if (!res.ok || failed) {
+        const detail = failed?.Errors?.[0] ?? {};
+        throw new Error(`Mailjet error ${res.status}: ${detail.ErrorCode ?? body.ErrorIdentifier ?? 'unknown'}: ${detail.ErrorMessage ?? body.ErrorMessage ?? 'request failed'}`);
+      }
+      return body;
+    },
+  };
+}
+
+// Elige el transport: MAIL_PROVIDER manda; si no, el primero con credenciales: Brevo, Mailjet, Resend; si no, consola.
+export function createMailer({
+  env = config.env,
+  resendApiKey = config.resendApiKey,
+  brevoApiKey = config.brevoApiKey,
+  mailjetApiKey = config.mailjetApiKey,
+  mailjetSecretKey = config.mailjetSecretKey,
+  provider = config.mailProvider,
+  from = config.mailFrom,
+  client,
+  fetchImpl,
+} = {}) {
   if (env !== 'production') return createConsoleTransport({ env });
-  const choice = provider || (brevoApiKey ? 'brevo' : resendApiKey ? 'resend' : 'console');
+  const hasMailjet = Boolean(mailjetApiKey && mailjetSecretKey);
+  const choice = provider || (brevoApiKey ? 'brevo' : hasMailjet ? 'mailjet' : resendApiKey ? 'resend' : 'console');
   if (choice === 'brevo' && brevoApiKey) return createBrevoTransport({ apiKey: brevoApiKey, from, fetchImpl });
+  if (choice === 'mailjet' && hasMailjet) return createMailjetTransport({ apiKey: mailjetApiKey, secretKey: mailjetSecretKey, from, fetchImpl });
   if (choice === 'resend' && resendApiKey) return createResendTransport({ apiKey: resendApiKey, from, client });
   return createConsoleTransport({ env });
 }
 
 export const mailer = createMailer();
 if (config.env === 'production' && mailer.name === 'console') {
-  console.warn('[mail] no mail provider configured (set BREVO_API_KEY or RESEND_API_KEY): emails, including login and verification codes, will NOT be delivered');
+  console.warn('[mail] no mail provider configured (set BREVO_API_KEY, MAILJET_API_KEY + MAILJET_SECRET_KEY, or RESEND_API_KEY): emails, including login and verification codes, will NOT be delivered');
 } else if (config.env === 'production') {
   console.log(`[mail] sending through ${mailer.name}`);
 }
