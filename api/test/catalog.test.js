@@ -234,3 +234,39 @@ test('an item accepts at most 8 images', async () => {
   assert.equal(extra.status, 409);
   assert.equal(extra.body.error.code, 'IMAGE_LIMIT');
 });
+
+test('GET /stores lists only active stores, with filters and cursor pagination', async () => {
+  const tag = `Tienda${uniq()}`;
+  const a = await newSeller(D, { name: `${tag} Alfa`, city: 'Ciudad Alfa' });
+  const b = await newSeller(D, { name: `${tag} Beta`, city: 'Ciudad Beta' });
+  const c = await newSeller(D, { name: `${tag} Gamma`, city: 'Ciudad Alfa' });
+  await authed(request(app).patch(`${api}/seller/store`), c.token).send({ status: 'paused' });
+  await authed(request(app).delete(`${api}/seller/store`), b.token);
+
+  const list = (q = {}) => request(app).get(`${api}/stores`).query(q);
+
+  // Público, sin token; solo activas (la pausada y la cerrada no salen).
+  const res = await list({ q: tag });
+  assert.equal(res.status, 200);
+  assert.deepEqual(res.body.stores.map((s) => s.id), [a.store.id]);
+  assert.equal(res.body.nextCursor, null);
+  assert.deepEqual(Object.keys(res.body.stores[0]).sort(), ['address', 'city', 'currency', 'description', 'id', 'latitude', 'longitude', 'name', 'status']);
+  assert.equal(res.body.stores[0].status, 'active');
+
+  // Filtro por ciudad y escape de comodines.
+  assert.equal((await list({ q: tag, city: 'ciudad alfa' })).body.stores.length, 1);
+  assert.equal((await list({ q: tag, city: 'Beta' })).body.stores.length, 0);
+  assert.equal((await list({ q: '%' })).body.stores.length, 0);
+
+  // Paginación por cursor, de la más nueva a la más antigua.
+  const d = await newSeller(D, { name: `${tag} Delta` });
+  const p1 = await list({ q: tag, limit: 1 });
+  assert.deepEqual(p1.body.stores.map((s) => s.id), [d.store.id]);
+  assert.ok(p1.body.nextCursor);
+  const p2 = await list({ q: tag, limit: 1, cursor: p1.body.nextCursor });
+  assert.deepEqual(p2.body.stores.map((s) => s.id), [a.store.id]);
+  assert.equal(p2.body.nextCursor, null);
+
+  assert.equal((await list({ limit: 0 })).body.error.code, 'INVALID_LIMIT');
+  assert.equal((await list({ cursor: 'zzz' })).body.error.code, 'INVALID_CURSOR');
+});
