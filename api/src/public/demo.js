@@ -5,6 +5,7 @@ const GROUPS = {
   General: [
     ['GET', '/api/v1/health'],
     ['GET', '/api/v1/ping'],
+    ['GET', '/api/v1/countries'],
   ],
   'Auth comprador': [
     ['POST', '/api/v1/auth/buyer/sign-up', { name: '', email: '', password: '', country: 'CO' }],

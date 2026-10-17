@@ -6,6 +6,7 @@ import { session, user } from '../db/schema.js';
 import { HttpError } from '../middlewares/errorHandler.js';
 import { validateOrganizationInput, validateStoreInput } from './storeService.js';
 import { countryCode } from './validation.js';
+import { countryName } from './countries.js';
 import { createSellerOrganization, presentOrganization, presentStore, sellerStatus } from './sellerService.js';
 
 // Traduce los errores de Better Auth al formato de errores de la API.
@@ -20,7 +21,15 @@ async function callAuth(fn) {
   }
 }
 
-const publicUser = ({ id, email, name, role, emailVerified, country }) => ({ id: Number(id), email, name, role, emailVerified, country: country ?? null });
+const publicUser = ({ id, email, name, role, emailVerified, country }) => ({
+  id: Number(id),
+  email,
+  name,
+  role,
+  emailVerified,
+  country: country ?? null,
+  countryName: countryName(country),
+});
 
 // country es opcional al registrarse; si viene, debe ser un código ISO válido.
 const optionalCountry = (value) => (value == null || value === '' ? null : countryCode(value, 'country'));
