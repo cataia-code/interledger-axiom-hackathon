@@ -46,11 +46,11 @@ Rutas genéricas de Better Auth (`/auth/email-otp/*`, `/auth/sign-out`): `{ "mes
 
 Cada rol tiene sus propias rutas. Un login solo acepta cuentas de su rol (si no, 403 `WRONG_ROLE`). No se puede enviar el rol desde el cliente: lo fija la ruta de registro.
 
-Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
+Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name", "role", "emailVerified", "country" } }` (el seller además recibe `organization` y `store` en el sign-up). **Guarda el token y envíalo en cada petición protegida.**
 
 | Método | Ruta | Body | Notas |
 |---|---|---|---|
-| POST | `/auth/buyer/sign-up` | `{email, password(≥8), name}` | 201. Envía código de verificación al correo (verificar es opcional) |
+| POST | `/auth/buyer/sign-up` | `{email, password(≥8), name, country?}` | 201. Envía código de verificación al correo (verificar es opcional) |
 | POST | `/auth/seller/sign-up` | ver abajo | 201. Crea usuario + organización + sucursal en un paso |
 | POST | `/auth/buyer/sign-in` · `/auth/seller/sign-in` | `{email, password}` | 200 |
 | POST | `/auth/buyer/sign-in/otp` · `/auth/seller/sign-in/otp` | `{email, otp}` | Login con código de 6 dígitos. No crea cuentas |
@@ -59,16 +59,18 @@ Respuesta de sign-up/sign-in: `{ "token": "…", "user": { "id", "email", "name"
 | POST | `/auth/email-otp/request-password-reset` | `{email}` | Envía código |
 | POST | `/auth/email-otp/reset-password` | `{email, otp, password}` | Cambia contraseña y revoca sesiones previas |
 | POST | `/auth/sign-out` | `{}` + Bearer | Revoca el token |
-| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone}}` |
-| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null)}` | |
+| GET | `/me` | | `{user:{id,email,name,role,emailVerified,phone,country}}` |
+| PATCH | `/me` | `{name?(1-80), phone?(≤30 \| null), country?(ISO 2 letras \| null)}` | 400 `INVALID_COUNTRY` si no es un código válido |
 
 Códigos OTP: 6 dígitos, caducan en 10 min, 3 intentos. Los códigos nuevos invalidan el anterior.
+
+**País de origen del usuario (`country`):** código ISO 3166-1 de 2 letras (`CO`, `PA`, `MX`…), opcional al registrarse (comprador o vendedor), se guarda en mayúsculas y se devuelve como `user.country` (`null` si no se dio). Un valor inválido responde 400 `INVALID_COUNTRY` y **no crea la cuenta**. Se puede cambiar o borrar con `PATCH /me`. En el vendedor es independiente de `organization.country` (país legal de la organización).
 
 **Body de `seller/sign-up`:**
 
 ```json
 {
-  "email": "luna@ejemplo.com", "password": "Password-12345", "name": "Luna",
+  "email": "luna@ejemplo.com", "password": "Password-12345", "name": "Luna", "country": "PA",
   "organization": {
     "legalName": "Panadería Luna S.A.", "tradeName": "Luna (opcional)",
     "taxId": "8-123-456", "legalId": "RM-2024-001",

@@ -23,6 +23,7 @@ export const auth = betterAuth({
     additionalFields: {
       role: { type: 'string', required: true, defaultValue: 'buyer', input: false },
       phone: { type: 'string', required: false, input: false },
+      country: { type: 'string', required: false, input: false },
     },
   },
   plugins: [

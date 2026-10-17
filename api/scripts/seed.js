@@ -51,11 +51,13 @@ async function upload(method, path, token, png) {
 
 // Registra la cuenta; si ya existe (422), inicia sesión. Devuelve el token.
 async function account(role, signUpBody) {
-  const up = await call('POST', `/auth/${role}/sign-up`, { body: signUpBody });
+  const up = await call('POST', `/auth/${role}/sign-up`, { body: { country: 'CO', ...signUpBody } });
   if (up.status === 201) return up.data.token;
   if (up.status !== 422) throw new Error(`${role} sign-up ${up.status}: ${JSON.stringify(up.data)}`);
   const inn = await call('POST', `/auth/${role}/sign-in`, { body: { email: signUpBody.email, password: PASSWORD } });
   if (inn.status !== 200) throw new Error(`${role} sign-in ${inn.status}: ${JSON.stringify(inn.data)}`);
+  // Cuentas creadas antes de existir el país: se lo ponemos.
+  if (!inn.data.user.country) await call('PATCH', '/me', { token: inn.data.token, body: { country: 'CO' } });
   return inn.data.token;
 }
 

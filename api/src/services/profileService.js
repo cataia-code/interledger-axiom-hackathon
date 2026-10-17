@@ -2,8 +2,9 @@ import { eq } from 'drizzle-orm';
 import { db } from '../db/index.js';
 import { user } from '../db/schema.js';
 import { HttpError } from '../middlewares/errorHandler.js';
+import { countryCode } from './validation.js';
 
-// Editar el propio perfil: solo nombre y teléfono.
+// Editar el propio perfil: nombre, teléfono y país de origen.
 export async function updateProfile(userId, body) {
   const b = body && typeof body === 'object' ? body : {};
   const patch = {};
@@ -18,6 +19,7 @@ export async function updateProfile(userId, body) {
     }
     patch.phone = b.phone ? b.phone.trim() || null : null;
   }
+  if (b.country !== undefined) patch.country = b.country === null || b.country === '' ? null : countryCode(b.country, 'country');
   if (Object.keys(patch).length === 0) throw new HttpError(400, 'Nothing to update', 'EMPTY_UPDATE');
   const [row] = await db.update(user).set(patch).where(eq(user.id, Number(userId))).returning();
   return row;
