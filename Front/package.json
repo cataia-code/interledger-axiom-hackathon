@@ -1,0 +1,24 @@
+{
+  "name": "lokora",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "Lokora: turismo, comercio local y pagos sin fronteras",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "dev": "node server.js",
+    "start": "node server.js",
+    "build": "vite build",
+    "preview": "NODE_ENV=production node server.js"
+  },
+  "dependencies": {
+    "react": "19.3.0",
+    "react-dom": "19.3.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "6.1.1",
+    "vite": "8.3.1"
+  }
+}

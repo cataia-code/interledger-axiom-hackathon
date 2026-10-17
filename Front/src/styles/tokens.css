@@ -1,0 +1,22 @@
+:root {
+  --cream: #f8f4e7;
+  --paper: #fffdf7;
+  --navy: #1e3a52;
+  --wine: #a12d4a;
+  --teal: #2e7d73;
+  --gold: #f0b429;
+  --gray: #94a3bb;
+  --muted: #687879;
+  --line: #e9e2d5;
+  --shadow: 0 5px 18px #1e3a520c;
+  --font-body: Inter, system-ui, sans-serif;
+  --font-heading: Poppins, system-ui, sans-serif;
+  --ease: cubic-bezier(.2, .8, .25, 1);
+  --radius: 14px;
+  font-family: var(--font-body);
+  color: var(--navy);
+  background: #e9e5da;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
