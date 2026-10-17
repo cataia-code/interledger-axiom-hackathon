@@ -36,6 +36,10 @@ Open Payments es un estándar, no una pasarela propia. El backend firma como cli
 
 El dinero sale de la wallet del comprador y entra en la wallet principal de quien dueña la tienda. Un cobro tiene un solo receptor.
 
+## 🗺️ Flujos y diagramas
+
+El recorrido del cobro, las wallets y la aprobación están dibujados en la [documentación del proyecto](https://claude.ai/artifact/MJMcf52BZ8kfVK3NnZL21B).
+
 ## ✨ Por qué ahora
 
 Hasta hace poco, cobrarle a alguien de otra entidad pedía un convenio por banco. Open Payments deja que la misma app hable con cualquiera que implemente el estándar: se cotiza la tasa en el momento, se muestra el fee y se aprueba una sola vez. La red de pruebas ya permite recorrerlo de punta a punta, con wallets en monedas distintas, sin mover dinero real.
