@@ -1,0 +1,17 @@
+export const sellerCountries = [
+  { code: 'AR', cities: [['Buenos Aires', -34.6037, -58.3816], ['Córdoba', -31.4201, -64.1888], ['Rosario', -32.9442, -60.6505], ['Mendoza', -32.8895, -68.8458]] },
+  { code: 'BR', cities: [['São Paulo', -23.5505, -46.6333], ['Rio de Janeiro', -22.9068, -43.1729], ['Brasília', -15.7939, -47.8828], ['Salvador', -12.9777, -38.5016], ['Curitiba', -25.4284, -49.2733]] },
+  { code: 'CA', cities: [['Toronto', 43.6532, -79.3832], ['Montréal', 45.5019, -73.5674], ['Vancouver', 49.2827, -123.1207], ['Ottawa', 45.4215, -75.6972], ['Calgary', 51.0447, -114.0719]] },
+  { code: 'CL', cities: [['Santiago', -33.4489, -70.6693], ['Valparaíso', -33.0472, -71.6127], ['Concepción', -36.8201, -73.0444], ['Antofagasta', -23.6509, -70.3975]] },
+  { code: 'CO', cities: [['Bogotá', 4.711, -74.0721], ['Medellín', 6.2442, -75.5812], ['Cali', 3.4516, -76.532], ['Barranquilla', 10.9685, -74.7813], ['Cartagena', 10.391, -75.4794], ['Bucaramanga', 7.1193, -73.1227], ['Pereira', 4.8087, -75.6906], ['Santa Marta', 11.2404, -74.199]] },
+  { code: 'DE', cities: [['Berlín', 52.52, 13.405], ['Hamburgo', 53.5511, 9.9937], ['Múnich', 48.1351, 11.582], ['Fráncfort', 50.1109, 8.6821]] },
+  { code: 'DO', cities: [['Santo Domingo', 18.4861, -69.9312], ['Santiago de los Caballeros', 19.4517, -70.697], ['Punta Cana', 18.5601, -68.3725]] },
+  { code: 'EC', cities: [['Quito', -0.1807, -78.4678], ['Guayaquil', -2.170998, -79.9224], ['Cuenca', -2.9001, -79.0059], ['Manta', -0.9677, -80.7089]] },
+  { code: 'ES', cities: [['Madrid', 40.4168, -3.7038], ['Barcelona', 41.3874, 2.1686], ['Valencia', 39.4699, -0.3763], ['Sevilla', 37.3891, -5.9845], ['Málaga', 36.7213, -4.4214], ['Bilbao', 43.263, -2.935]] },
+  { code: 'FR', cities: [['París', 48.8566, 2.3522], ['Marsella', 43.2965, 5.3698], ['Lyon', 45.764, 4.8357], ['Toulouse', 43.6047, 1.4442]] },
+  { code: 'GB', cities: [['Londres', 51.5072, -0.1276], ['Manchester', 53.4808, -2.2426], ['Birmingham', 52.4862, -1.8904], ['Edimburgo', 55.9533, -3.1883]] },
+  { code: 'MX', cities: [['Ciudad de México', 19.4326, -99.1332], ['Guadalajara', 20.6597, -103.3496], ['Monterrey', 25.6866, -100.3161], ['Puebla', 19.0414, -98.2063], ['Mérida', 20.9674, -89.5926], ['Cancún', 21.1619, -86.8515]] },
+  { code: 'PA', cities: [['Ciudad de Panamá', 8.9824, -79.5199], ['David', 8.4273, -82.4308], ['Colón', 9.3547, -79.9003]] },
+  { code: 'PE', cities: [['Lima', -12.0464, -77.0428], ['Arequipa', -16.409, -71.5375], ['Cusco', -13.5319, -71.9675], ['Trujillo', -8.1116, -79.0288]] },
+  { code: 'US', cities: [['Nueva York', 40.7128, -74.006], ['Los Ángeles', 34.0522, -118.2437], ['Chicago', 41.8781, -87.6298], ['Houston', 29.7604, -95.3698], ['Miami', 25.7617, -80.1918], ['San Francisco', 37.7749, -122.4194]] },
+];

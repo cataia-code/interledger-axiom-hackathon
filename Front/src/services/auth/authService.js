@@ -37,7 +37,7 @@ async function register(values) {
   const role = values.initialIntent === 'sell' ? 'seller' : 'buyer';
   if (role === 'seller' && (!values.organization || !values.store)) throw new ApiError('El registro de vendedor requiere los datos legales de la organización y de la sucursal.', { code: 'SELLER_ONBOARDING_REQUIRED' });
   const body = { email: values.email.trim(), password: values.password, name: values.name.trim(),
-    ...(role === 'seller' ? { organization: values.organization, store: values.store } : {}) };
+    ...(role === 'seller' ? { country: values.country, dateOfBirth: values.dateOfBirth, documentType: values.documentType, organization: values.organization, store: values.store } : {}) };
   return acceptSession(await request(`/auth/${role}/sign-up`, { method: 'POST', body, auth: false }), true);
 }
 const http = {

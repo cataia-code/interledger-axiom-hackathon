@@ -1,4 +1,26 @@
 .account-page { position: relative; padding: 18px 0 25px; }
+/* Both account types share one viewport layout and a footer outside the scroll area. */
+.app-frame:has(.account-page--register) { min-height: 0; }
+.page-register { display: flex; flex-direction: column; height: 100%; min-height: 0; padding-bottom: 0; }
+.account-page--register { display: flex; flex-direction: column; flex: 1; min-height: 0; padding: 0; }
+.account-page--register .account-page__content { display: flex; flex-direction: column; flex: 1; min-height: 0; min-width: 0; overflow-y: auto; padding-top: 18px; scrollbar-width: none; }
+.account-page--register .account-page__content::-webkit-scrollbar { display: none; }
+/* Keep focus and translucent fills inside each rounded box. */
+.account-page--register :is(input, select, textarea, .seller-date-field__trigger):focus-visible,
+.account-page--register .account-intent label:has(input:focus-visible) { outline-offset: -3px; }
+.account-page--register :is(.account-intent label, .account-form input, .account-form select, .account-form textarea, .seller-receiving-wallet) { background-clip: padding-box; min-width: 0; max-width: 100%; }
+.account-page--register .account-page__content > .account-page__top,
+.account-page--register .account-page__content > header,
+.account-page--register .account-page__content > .account-intent { flex-shrink: 0; }
+.account-page--register .account-form { display: flex; flex-direction: column; flex: 1 0 auto; padding-bottom: 6px; }
+.account-page--register .account-form > .button { margin-top: auto; }
+.account-page--register .seller-registration { flex: 1; }
+.account-page--register .seller-registration__fields { flex: 1; }
+.account-page--register .account-page__footer { flex: 0 0 auto; padding: 12px 0 max(16px, env(safe-area-inset-bottom)); background: var(--cream); }
+.account-page--register .account-page__actions { display: flex; }
+.account-page--register .account-page__actions > * { flex: 1; }
+.account-page--register .account-page__switch { margin: 16px 0 0; }
+.account-page--register .account-page__demo { margin-top: 8px; }
 .account-page > .icon-button { position: absolute; left: 0; top: 22px; }
 .account-page > .brand-logo { margin: 0 auto 25px; width: 160px; height: 55px; }
 .account-page header h1 { font: 600 26px/1.2 var(--font-heading); letter-spacing: -.7px; margin: 8px 0; }
@@ -34,8 +56,71 @@
 .create-store-intro h1 { font-size: 24px; line-height: 1.2; }
 .create-store-intro p { color: var(--muted); font-size: 12px; margin: 15px 0 20px; }
 .create-store-intro > .button--quiet { margin-top: 10px; }
-.seller-registration { display: grid; gap: 14px; border: 1px solid var(--line); padding: 16px; border-radius: 14px; min-width: 0; }
+.seller-registration { display: flex; flex-direction: column; gap: 6px; border: 0; margin: 0; padding: 0; min-width: 0; font-family: var(--font-body); }
 .seller-registration legend { font-size: 13px; font-weight: 600; padding: 0 6px; }
+.seller-registration__progress { display: grid; grid-template-columns: minmax(0, 1fr) max-content; align-items: center; gap: 5px 9px; }
+.seller-registration__progress > span { grid-column: 2; grid-row: 1; color: var(--muted); font-size: 10px; }
+.seller-registration__progress > div { grid-column: 1 / -1; grid-row: 2; height: 4px; border-radius: 5px; overflow: hidden; background: var(--line); }
+.seller-registration__progress > div > span { display: block; height: 100%; border-radius: inherit; background: var(--teal); transition: width .2s ease; }
+.seller-registration__progress h2 { grid-column: 1; grid-row: 1; font-size: 14px; line-height: 1.2; }
+/* Use the same natural content flow and field spacing as the buyer form. */
+.seller-registration__fields { display: grid; grid-template-columns: minmax(0, 1fr); gap: 13px; align-content: start; }
+.seller-registration__fields label, .seller-date-field { min-width: 0; gap: 6px; }
+.seller-registration select { appearance: none; padding-right: 42px; background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23536667' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m7 10 5 5 5-5'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 14px center; }
+.seller-location-error { color: #a30c3c !important; font-size: 11px !important; }
+.account-form--seller { font-family: var(--font-body); }
+.seller-registration input, .seller-registration select, .seller-registration button { font-family: var(--font-body); }
+.seller-registration__fields select { min-height: 44px; }
+.seller-coordinate-fields { display: grid; grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.seller-coordinate-fields > label { min-width: 0; }
+.seller-coordinate-fields input { box-sizing: border-box; width: 100%; }
+.seller-location-lookup { display: grid; grid-template-columns: minmax(0, 1fr); align-items: start; gap: 8px; }
+.seller-registration__fields > .seller-location-lookup,
+.seller-registration__fields > small,
+.seller-registration__fields > .seller-receiving-wallet,
+.seller-receiving-wallet > .wallet-form-heading { grid-column: 1 / -1; }
+.seller-registration__fields > .seller-receiving-wallet { display: grid; gap: 7px; padding: 9px; margin: 0; border-radius: 16px; }
+.seller-receiving-wallet .wallet-form-heading { gap: 8px; padding-bottom: 6px; }
+.seller-receiving-wallet .wallet-icon-tile { width: 34px; height: 34px; border-radius: 11px; }
+.seller-receiving-wallet .wallet-icon-tile > .lk-icon { width: 21px; height: 21px; }
+.seller-receiving-wallet .wallet-form-heading h2 { font-size: 13px; }
+.seller-receiving-wallet .wallet-form-heading p { margin-top: 2px; font-size: 9px; }
+.seller-receiving-wallet label { font-size: 11px; }
+.seller-receiving-wallet > small { font-size: 9px; line-height: 1.3; }
+.seller-location-lookup > small { margin: 0; }
+.seller-location-lookup > .button { justify-self: start; max-width: 100%; }
+.seller-date-field { position: relative; display: grid; gap: 6px; font-size: 11px; font-weight: 600; }
+.seller-date-field__trigger { width: 100%; min-height: 44px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 11px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); color: var(--navy); text-align: left; font: 400 13px var(--font-body); }
+.seller-date-field__trigger[aria-invalid=true] { border-color: #a30c3c; }
+.seller-date-field__trigger > span:last-child { color: var(--teal); font-size: 18px; line-height: 1; }
+.seller-calendar { position: absolute; z-index: 30; bottom: calc(100% + 5px); left: 0; width: min(300px, calc(100vw - 64px)); padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); box-shadow: 0 14px 36px #1e3a5230; color: var(--navy); font-family: var(--font-body); font-size: 12px; }
+.seller-calendar__header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 10px; text-transform: capitalize; }
+.seller-calendar__header button { width: 32px; height: 32px; border: 1px solid var(--line); border-radius: 8px; background: white; font: 600 20px/1 var(--font-body); }
+.seller-calendar__header strong { font-size: 12px; font-weight: 600; }
+.seller-calendar__selectors { display: grid; grid-template-columns: 1.3fr .8fr; gap: 8px; margin-bottom: 9px; }
+.seller-calendar__selectors select { min-height: 36px; padding: 6px 30px 6px 9px; border: 1px solid var(--line); border-radius: 8px; background-color: white; font: 400 12px var(--font-body); text-transform: capitalize; }
+.seller-calendar__grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 3px; text-align: center; }
+.seller-calendar__weekday { padding: 5px 0; color: var(--muted); font-size: 10px; font-weight: 600; text-transform: capitalize; }
+.seller-calendar__grid button { aspect-ratio: 1; border: 0; border-radius: 50%; background: transparent; font: 400 11px var(--font-body); }
+.seller-calendar__grid button:hover:not(:disabled), .seller-calendar__grid button.is-selected { background: var(--teal); color: white; }
+.seller-calendar__grid button:disabled { color: #b8c0bd; cursor: default; }
+.seller-registration__navigation { display: flex; gap: 10px; }
+.seller-registration__navigation > .button { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 400px) {
+  /* Reserve room for a two-line action without moving the footer between steps. */
+  .account-page--register .account-page__actions { min-block-size: 3.5rem; }
+}
+@media (max-height: 800px) {
+  /* Compact the shared heading so both forms keep room for fields and footer. */
+  .account-page--register .account-page__content { padding-top: 8px; }
+  .account-page--register .account-page__top { margin-bottom: 10px; }
+  .account-page--register .account-page__top > .brand-logo { height: 42px; }
+  .account-page--register header h1 { margin: 4px 0; }
+  .account-page--register header p { margin-bottom: 12px; }
+  .account-page--register .account-intent { margin-bottom: 8px; }
+  .account-page--register .account-intent legend { margin-bottom: 4px; }
+  .account-page--register .account-intent label { min-height: 68px; padding: 7px 10px; }
+}
 .auth-methods { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; padding: 5px; margin-bottom: 20px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .auth-methods button { padding: 10px 8px; min-height: 44px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; }
 .auth-methods button[aria-pressed=true] { background: var(--teal); color: white; }
