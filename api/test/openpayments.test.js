@@ -13,7 +13,7 @@ const { user } = await import('../src/db/schema.js');
 const { order } = await import('../src/db/orders.js');
 const { payment } = await import('../src/db/payments.js');
 const { paymentSession } = await import('../src/db/wallets.js');
-const { setClientFactory, pollOptions, interactionHash } = await import('../src/payments/openpayments.js');
+const { setClientFactory, pollOptions, interactionHash, normalizePrivateKey } = await import('../src/payments/openpayments.js');
 const { authed, newBuyer, newSeller, uniq } = await import('./helpers.js');
 
 const D = 'optest.local';
@@ -282,4 +282,21 @@ test('límite de wallets por usuario', async () => {
   const buyer = await newBuyer(D);
   for (let i = 0; i < 10; i += 1) assert.equal((await link(buyer, `https://ilp.test/w${i}`)).status, 201);
   assert.equal((await link(buyer, 'https://ilp.test/w10')).body.error.code, 'WALLET_LIMIT');
+});
+
+test('la llave privada se acepta como PEM, base64 del PEM o solo el cuerpo base64', async () => {
+  const { generateKeyPairSync, createPrivateKey } = await import('node:crypto');
+  const pem = generateKeyPairSync('ed25519').privateKey.export({ type: 'pkcs8', format: 'pem' });
+  const body = pem.replace(/-----[A-Z ]+-----/g, '').replace(/\s+/g, '');
+  const variants = {
+    pem,
+    'pem con \\n literales': pem.trim().replaceAll('\n', '\\n'),
+    'base64 del pem': Buffer.from(pem).toString('base64'),
+    'cuerpo pelado': body,
+    'cuerpo pelado con espacios': ` ${body.slice(0, 20)} ${body.slice(20)} `,
+  };
+  for (const [name, value] of Object.entries(variants)) {
+    const key = createPrivateKey(normalizePrivateKey(value));
+    assert.equal(key.asymmetricKeyType, 'ed25519', name);
+  }
 });

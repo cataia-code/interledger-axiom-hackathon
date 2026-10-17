@@ -16,15 +16,20 @@ export const setClientFactory = (fn) => {
 };
 export const pollOptions = { attempts: 15, intervalMs: 2000 };
 
+// Acepta la llave como PEM (con o sin saltos de línea reales), como base64 del PEM, o como el cuerpo base64 pelado (PKCS8)
+// sin las líneas BEGIN/END, que es lo que más cómodo se pega en una variable de entorno.
+export function normalizePrivateKey(value) {
+  const raw = value.trim().replaceAll('\\n', '\n');
+  if (raw.includes('BEGIN')) return raw;
+  const compact = raw.replace(/\s+/g, '');
+  const decoded = Buffer.from(compact, 'base64').toString('utf8');
+  if (decoded.includes('BEGIN')) return decoded;
+  return `-----BEGIN PRIVATE KEY-----\n${compact.match(/.{1,64}/g).join('\n')}\n-----END PRIVATE KEY-----\n`;
+}
+
 function privateKeyMaterial() {
-  if (config.opPrivateKey) {
-    const raw = config.opPrivateKey.trim().replaceAll('\\n', '\n');
-    return raw.includes('BEGIN') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-  }
-  if (config.opPrivateKeyPath) {
-    const raw = readFileSync(config.opPrivateKeyPath, 'utf8').trim();
-    return raw.includes('BEGIN') ? raw : Buffer.from(raw, 'base64').toString('utf8');
-  }
+  if (config.opPrivateKey) return normalizePrivateKey(config.opPrivateKey);
+  if (config.opPrivateKeyPath) return normalizePrivateKey(readFileSync(config.opPrivateKeyPath, 'utf8'));
   throw new HttpError(503, 'Open Payments is not configured', 'PAYMENT_PROVIDER_UNAVAILABLE');
 }
 
