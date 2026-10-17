@@ -1,0 +1,25 @@
+.impact-notice { border: 1px solid var(--line); border-left: 3px solid var(--teal); border-radius: 12px; padding: 12px; margin: 12px 0; background: var(--paper); font-size: 12px; }
+.impact-stores { display: grid; gap: 10px; }
+.impact-store { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px; text-align: left; color: var(--navy); }
+.impact-store .store-logo { width: 44px; height: 44px; }
+.impact-store__name { flex: 1; min-width: 0; }
+.impact-store__name b, .impact-store__name small { display: block; }
+.impact-store__name b { font-size: 13px; }
+.impact-store__name small { color: var(--muted); font-size: 10px; }
+.impact-store__score { color: var(--teal); font-size: 18px; white-space: nowrap; }
+.impact-store__score small { font-size: 10px; }
+.impact-store__rank { font-size: 15px; width: 20px; text-align: center; color: var(--wine); }
+.impact-store-detail { display: flex; align-items: center; gap: 12px; padding: 14px; margin: 12px 0; font-size: 12px; }
+.impact-store-detail .store-logo { width: 52px; height: 52px; }
+.store-score { padding: 20px; margin-bottom: 16px; }
+.store-score strong { display: block; color: var(--teal); font-size: 50px; line-height: 1.2; margin: 8px 0; }
+.store-score strong small { font-size: 16px; font-weight: 400; }
+.store-score p { font-size: 12px; color: var(--muted); }
+.store-score__badges { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin: 12px 0; font-size: 12px; }
+.store-score__badges .lk-icon { width: 17px; height: 17px; margin-right: 5px; }
+.store-score > small { font-size: 11px; color: var(--muted); }
+.score-breakdown { padding: 16px; display: grid; gap: 16px; }
+.score-breakdown > div { display: grid; grid-template-columns: 1fr auto; gap: 7px; font-size: 12px; }
+.score-breakdown b { color: var(--teal); }
+.score-breakdown meter { grid-column: 1 / -1; width: 100%; height: 10px; accent-color: var(--teal); }
+.impact-status { padding: 20px; font-size: 12px; }

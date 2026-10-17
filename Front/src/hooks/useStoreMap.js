@@ -3,7 +3,7 @@ import { getMapConfig } from '../services/maps/loaders';
 import { createLeafletMap } from '../services/maps/leafletAdapter';
 import { createGoogleMap } from '../services/maps/googleAdapter';
 
-export function useStoreMap({ shops, visibleIds, selectedId, onSelect }) {
+export function useStoreMap({ shops, visibleIds, selectedId, onSelect, location }) {
   const containerRef = useRef(null);
   const adapterRef = useRef(null);
   const disableGoogleRef = useRef(false);
@@ -37,6 +37,8 @@ export function useStoreMap({ shops, visibleIds, selectedId, onSelect }) {
   }, [shops, onSelect, retryCount]);
   useEffect(() => { if (status === 'ready') adapterRef.current?.update(visibleIds, selectedId); }, [visibleIds, selectedId, status]);
   const center = useCallback(() => adapterRef.current?.center(), []);
+  const centerOn = useCallback(location => adapterRef.current?.centerOn?.(location), []);
+  useEffect(() => { if (status === 'ready') { adapterRef.current?.updateLocation?.(location); if (location) adapterRef.current?.centerOn?.(location); } }, [location, status]);
   const retry = useCallback(() => setRetryCount(current => current + 1), []);
-  return { containerRef, status, provider, center, retry };
+  return { containerRef, status, provider, center, centerOn, retry };
 }

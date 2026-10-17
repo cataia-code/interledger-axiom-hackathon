@@ -1,17 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from '../i18n/useTranslation';
 import { useApp } from '../context/AppContext';
 import PageHeading, { SectionHeading } from '../components/ui/PageHeading';
 import { Button } from '../components/ui/Button';
 import Icon from '../components/ui/Icon';
-import { money, REFERENCE_RATE, toUSD } from '../lib/currency';
-import { getShop } from '../data/shops';
+import PurchaseCard from '../components/payments/PurchaseCard';
+import { purchaseState } from '../lib/purchaseState';
+
+const filters = [{ id: 'all', label: 'Todas' }, { id: 'paid', label: 'Pagadas' }, { id: 'pending', label: 'Pendientes' }, { id: 'incomplete', label: 'No completadas' }];
 export default function WalletPage() {
-  const { navigate, balanceUSD, payments } = useApp();
-  const [amount, setAmount] = useState(85000);
-  return <><PageHeading eyebrow="PAGA EN TU MONEDA" title="Mi wallet" description="Tu saldo para comprar local." onBack={() => navigate('profile')} />
-    <article className="wallet-card"><Icon name="wallet" /><small>SALDO DISPONIBLE</small><strong>{money(balanceUSD, 'USD')}</strong><span>•••• &nbsp; •••• &nbsp; •••• &nbsp; 2048</span><small>Wallet de demostración</small></article>
-    <SectionHeading title="Previsualiza tu compra" /><div className="surface wallet-convert"><label htmlFor="wallet-amount">Valor de la compra en pesos</label><div className="currency-input"><input id="wallet-amount" type="number" min="0" value={amount} onChange={event => setAmount(Number(event.target.value))} /><b>COP</b></div>
-      <p className="conversion">Se debitarían <strong>{money(toUSD(amount), 'USD')}</strong></p><small>Tasa de ejemplo: 1 USD = {money(REFERENCE_RATE)}</small><Button className="wide" icon="arrowRight" onClick={() => navigate('map')}>Explorar tiendas</Button>
-    </div><SectionHeading title="Movimientos recientes" /><div className="surface transaction-list">{payments.length ? payments.map((payment, index) => <div className="setting-row" key={`${payment.date}-${index}`}><span>{getShop(payment.shopId).name}<small>Compra de demostración</small></span><b>−{money(payment.debit, 'USD')}</b></div>) : <><div className="setting-row"><span>Café Ancestral<small>Ejemplo · Hoy</small></span><b>−US$ 8,00</b></div><div className="setting-row"><span>Artesanías Bacatá<small>Ejemplo · Ayer</small></span><b>−US$ 35,00</b></div></>}</div>
+  const { t } = useTranslation();
+  const { navigate, payments, purchasesLoading, purchasesError, refreshPurchases, findShop } = useApp();
+  const [filter, setFilter] = useState('all');
+  useEffect(() => { refreshPurchases(); }, [refreshPurchases]);
+  const ordered = useMemo(() => [...payments].sort((a, b) => Date.parse(b.date) - Date.parse(a.date)), [payments]);
+  const visible = ordered.filter(purchase => filter === 'all' || purchaseState(purchase).group === filter);
+  const pendingCount = ordered.filter(purchase => purchaseState(purchase).group === 'pending').length;
+  return <><PageHeading eyebrow={t('TU RECORRIDO LOCAL')} title={t('Mis compras')} description={t('Historial de compras y pagos.')} onBack={() => navigate('profile')} />
+    {pendingCount > 0 && <p className="purchase-pending-note"><Icon name="info" />{t('{{count}} pendientes de confirmación', { count: pendingCount })}</p>}
+    <SectionHeading title={t('Historial de pedidos')}><Button variant="quiet" disabled={purchasesLoading} onClick={refreshPurchases}>{t(purchasesLoading ? 'Actualizando…' : 'Actualizar')}</Button></SectionHeading>
+    <div className="purchase-filters" role="group" aria-label={t('Filtrar compras por estado')}>{filters.map(option => <button key={option.id} aria-pressed={filter === option.id} onClick={() => setFilter(option.id)}>{t(option.label)}</button>)}</div>
+    {purchasesError && <p className="field-error" role="alert">{t(purchasesError)} {payments.length > 0 && t('Los estados mostrados pueden estar desactualizados.')}</p>}
+    {purchasesLoading && <p className="caption" role="status">{t('Cargando compras…')}</p>}
+    {visible.length > 0 && <ul className="surface purchase-history" aria-busy={purchasesLoading}>{visible.map(purchase => <li key={purchase.orderId || purchase.id || purchase.date}><PurchaseCard purchase={purchase} shop={findShop(purchase.shopId)} /></li>)}</ul>}
+    {!purchasesLoading && !purchasesError && !visible.length && <div className="surface information-card"><Icon name="receipt" /><p>{t(payments.length ? 'No hay pedidos con este estado.' : 'Aún no tienes pedidos. Descubre una tienda para comenzar.')}</p></div>}
+    <Button className="wide space-top" icon="arrowRight" onClick={() => navigate('home/map')}>{t('Descubrir tiendas')}</Button>
   </>;
 }

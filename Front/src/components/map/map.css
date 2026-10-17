@@ -35,3 +35,11 @@
 .store-map .leaflet-control-zoom a { color: var(--navy); background: var(--paper); }
 .store-map .leaflet-control-attribution { font-size: 8px; }
 @media (max-width: 370px) { .map-shop-sheet { gap: 8px; } .map-shop-sheet .store-logo { width: 61px; height: 61px; } .map-shop-sheet h2 { font-size: 12px; } }
+
+/* Location is requested only when the user activates Cerca de mí. */
+.home-map .home-map__locate { width: auto; min-width: 40px; display: flex; gap: 6px; padding: 0 12px; border-radius: 22px; font-size: 11px; }
+.home-map .home-map__locate.is-active { color: var(--paper); background: var(--teal); }
+.home-map__show-all { position: absolute; right: 12px; top: 60px; z-index: 600; border: 1px solid var(--line); border-radius: 18px; background: var(--paper); padding: 8px 12px; font-size: 10px; box-shadow: var(--shadow); }
+.home-map__location-error { position: absolute; top: 102px; left: 12px; right: 12px; z-index: 600; padding: 12px; border-radius: 12px; color: var(--navy); background: var(--paper); font-size: 11px; line-height: 1.5; box-shadow: var(--shadow); }
+.lokora-user-location { background: transparent; border: 0; }
+.lokora-user-location > span { display: block; width: 24px; height: 24px; border: 4px solid var(--paper); border-radius: 50%; background: var(--teal); box-shadow: 0 0 0 6px #2e7d7328, 0 2px 8px #1e3a5240; }

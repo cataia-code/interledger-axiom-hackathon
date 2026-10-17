@@ -50,3 +50,5 @@
 .tab-content { min-height: 120px; animation: page-arrive .25s var(--ease); }
 .store-checkout { position: sticky; bottom: -26px; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 12px 0; background: var(--cream); border-top: 1px solid var(--line); margin-top: 15px; }
 .store-checkout > span { font-size: 10px; font-weight: 600; }
+
+.media-placeholder { display: grid; place-items: center; background: var(--cream); color: var(--gray); }

@@ -1,12 +1,12 @@
+import { useTranslation } from '../../i18n/useTranslation';
 import { useApp } from '../../context/AppContext';
-import { money } from '../../lib/currency';
-import { REFERENCE_RATE } from '../../lib/currency';
 import Icon from '../ui/Icon';
 export default function HomeWalletCard() {
-  const { navigate, user, balanceUSD, walletLoading, openAccount, createMyStore, ownedShop } = useApp();
-  return <section className="home-wallet-card" aria-label="Resumen de tu wallet"><button className="home-wallet-card__balance" onClick={() => user ? navigate('wallet') : openAccount('buy', 'wallet')}>
-    <span className="home-wallet-card__icon"><Icon name="wallet" /></span><span><small>{user ? 'TU WALLET' : 'TU WALLET DE VIAJE'}</small><b>{walletLoading ? '···' : money(balanceUSD, 'USD')}</b></span>
-    <span className="home-wallet-card__exchange">≈ {walletLoading ? '···' : money(balanceUSD * REFERENCE_RATE)} COP</span><Icon name="chevron" className="home-wallet-card__arrow" /></button>
-    {user && !ownedShop && <button className="home-wallet-card__business" onClick={createMyStore}><Icon name="shop" /><span>¿Tienes un negocio?</span><b>Crea tu tienda</b><Icon name="arrowRight" /></button>}
+  const { t } = useTranslation();
+  const { navigate, user, openAccount, createMyStore, ownedShop } = useApp();
+  if (user?.role === 'seller') return <section className="home-wallet-card"><button className="home-wallet-card__balance" onClick={createMyStore}><span className="home-wallet-card__icon"><Icon name="shop" /></span><span><small>{t("TU NEGOCIO EN LOKORA")}</small><b>{ownedShop?.name || t('Mi tienda')}</b><small>{t("Gestiona tu sucursal")}</small></span><Icon name="chevron" className="home-wallet-card__arrow" /></button></section>;
+  return <section className="home-wallet-card" aria-label={t("Tus compras")}><button className="home-wallet-card__balance" onClick={() => user ? navigate('wallet') : openAccount('buy', 'wallet')}>
+    <span className="home-wallet-card__icon"><Icon name="wallet" /></span><span><small>{t("TU EXPERIENCIA LOCAL")}</small><b>{t("Compras con historia")}</b><small>{t("Revisa tus comprobantes")}</small></span><Icon name="chevron" className="home-wallet-card__arrow" /></button>
+
   </section>;
 }

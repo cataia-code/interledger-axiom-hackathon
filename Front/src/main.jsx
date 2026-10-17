@@ -1,5 +1,7 @@
 import { createRoot } from 'react-dom/client';
 import App from './App';
+import { readPaymentReturn } from './lib/paymentReturnBridge';
+import { showPaymentReturnBridge } from './pages/PaymentReturnBridgePage';
 import './styles/tokens.css';
 import './styles/global.css';
 import './components/layout/layout.css';
@@ -8,6 +10,16 @@ import './components/shops/shops.css';
 import './components/map/map.css';
 import './components/charts/charts.css';
 import './pages/pages.css';
+import './components/home/home.css';
+import './components/auth/account.css';
 import './styles/motion.css';
+import './components/cart/cart.css';
+import './components/payments/purchases.css';
+import './components/language/language.css';
+import './components/impact/impact.css';
+import './components/merchant/merchant.css';
+import './components/coupons/coupons.css';
 
-createRoot(document.getElementById('root')).render(<App />);
+const paymentReturn = readPaymentReturn();
+if (paymentReturn) showPaymentReturnBridge(paymentReturn.orderId);
+else createRoot(document.getElementById('root')).render(<App />);

@@ -1,0 +1,200 @@
+Endpoints nuevos
+NUEVO
+GET
+/stores
+NUEVO
+Público, sin token. Lista las tiendas activas (pausadas y cerradas no salen), de la más nueva a la más antigua.
+
+Query (todos opcionales)
+Parámetro	Detalle
+q	Texto en nombre o descripción (máx. 80)
+city	Ciudad (contiene, sin distinguir mayúsculas, máx. 80)
+limit	1 a 50 (por defecto 20). Error INVALID_LIMIT
+cursor	El nextCursor de la página anterior. Error INVALID_CURSOR
+Respuesta 200
+{
+  "stores": [
+    {
+      "id": 4, "name": "Panadería El Poblado",
+      "description": "Pan artesanal, almojábanas y repostería recién horneada.",
+      "city": "Medellín", "address": "Carrera 35 #8A-40, El Poblado",
+      "latitude": 6.2088, "longitude": -75.567, "currency": "COP",
+      "bannerUrl": "/uploads/stores/4/banner-….webp",
+      "iconUrl":   "/uploads/stores/4/icon-….webp",
+      "status": "active"
+    }
+  ],
+  "nextCursor": "4"      // null cuando no hay más
+}
+GET
+/countries
+NUEVO
+Público, sin token. Los 249 países oficiales, ordenados por nombre en español. Pensado para el desplegable de país. Cacheable un día.
+
+Respuesta 200
+{ "countries": [
+    { "code": "AF", "name": "Afganistán" },
+    { "code": "AL", "name": "Albania" },
+    { "code": "DE", "name": "Alemania" },
+    …
+    { "code": "CO", "name": "Colombia" }
+] }
+PUT
+/seller/store/banner
+NUEVO
+Rol seller (Bearer). Sube o reemplaza el banner de la tienda; el archivo anterior se borra. Límite: 20 por minuto.
+
+Petición
+multipart/form-data
+  image: archivo JPEG, PNG o WebP (máx. 5 MB)
+Se recorta a 1600×600 y se guarda como WebP.
+
+Respuesta 200
+{ "store": { "id": 4, …, "bannerUrl": "/uploads/stores/4/banner-.webp", "iconUrl": null, … } }
+Errores
+400 IMAGE_REQUIRED	No se envió el campo image
+400 INVALID_IMAGE	El archivo no es una imagen válida
+400 INVALID_IMAGE_TYPE	Tipo distinto de JPEG, PNG o WebP
+413 IMAGE_TOO_LARGE	Más de 5 MB
+401 / 403	Sin sesión / no es seller
+PUT
+/seller/store/icon
+NUEVO
+Igual que el banner. Se recorta a un círculo de 256×256 con fondo transparente, listo para usar como pin del mapa.
+
+Respuesta 200
+{ "store": { "id": 4, …, "bannerUrl": null, "iconUrl": "/uploads/stores/4/icon-.webp", … } }
+DELETE
+/seller/store/banner
+NUEVO
+Rol seller. Quita el banner y borra el archivo. Respuesta 200 con { "store": { …, "bannerUrl": null } }.
+
+DELETE
+/seller/store/icon
+NUEVO
+Rol seller. Quita el icono y borra el archivo. Respuesta 200 con { "store": { …, "iconUrl": null } }.
+
+Endpoints modificados
+MODIFICADO
+Mismo contrato de antes, más dos campos nuevos en el objeto de tienda: bannerUrl e iconUrl (ruta relativa al host, o null si no hay imagen).
+
+GET
+/stores/:id
+MODIFICADO
+Tienda pública. { store } ahora incluye bannerUrl e iconUrl.
+
+GET
+/seller/store
+MODIFICADO
+Tienda propia del vendedor, con bannerUrl e iconUrl.
+
+PATCH
+/seller/store
+MODIFICADO
+La tienda devuelta incluye bannerUrl e iconUrl. El body no cambia; las imágenes no se editan aquí sino con los PUT/DELETE de arriba.
+
+DELETE
+/seller/store
+MODIFICADO
+La tienda cerrada devuelta incluye bannerUrl e iconUrl.
+
+POST
+/auth/seller/sign-up
+MODIFICADO
+Dos cambios. La petición acepta un country opcional del usuario (ver más abajo), y el objeto store de la respuesta 201 incluye bannerUrl: null e iconUrl: null (aún no hay imágenes).
+
+País de origen del usuario
+MODIFICADO
+Campo nuevo, opcional al registrarse. Se envía el código ISO de 2 letras (CO) o el nombre del país en español o inglés, sin importar mayúsculas ni tildes (Colombia, panamá, Spain). La API guarda el código y responde con dos campos: country ("CO") y countryName ("Colombia", en español). Valen los 249 países oficiales; cualquier otro valor responde 400 INVALID_COUNTRY y no crea la cuenta.
+
+POST
+/auth/buyer/sign-up
+MODIFICADO
+Pública. El body acepta country (opcional): código o nombre. La respuesta trae user.country y user.countryName.
+
+Petición
+{ "email": "ana@ejemplo.com", "password": "Password-12345", "name": "Ana", "country": "Colombia" }
+Respuesta 201
+{ "token": "…",
+  "user": { "id": 7, "email": "ana@ejemplo.com", "name": "Ana", "role": "buyer",
+            "emailVerified": false, "country": "CO", "countryName": "Colombia" } }
+POST
+/auth/seller/sign-up
+MODIFICADO
+Igual: country opcional en el nivel superior del body, junto a email, password y name. Es el país de la persona y es independiente de organization.country (país legal de la organización).
+
+POST
+/auth/{buyer|seller}/sign-in
+y …/sign-in/otp
+MODIFICADO
+La petición no cambia. user ahora incluye country y countryName (ambos null si la cuenta no tiene).
+
+{ "token": "…", "user": { "id": 6, "email": "…", "name": "Alba", "role": "seller", "emailVerified": false, "country": "CO", "countryName": "Colombia" } }
+GET
+/me
+MODIFICADO
+Con Bearer. user incluye country y countryName.
+
+{ "user": { "id": 7, "email": "ana@ejemplo.com", "name": "Ana", "role": "buyer",
+            "emailVerified": false, "phone": null, "country": "CO", "countryName": "Colombia" } }
+PATCH
+/me
+MODIFICADO
+Con Bearer. El body acepta country (código o nombre) además de name y phone. Con null (o cadena vacía) se borra. Devuelve { user } con el país actualizado.
+
+{ "country": "México" }  // → country "MX", countryName "México"
+{ "country": "mx" }      // → country "MX"
+{ "country": null }      // → country null, countryName null
+{ "country": "Narnia" }  // → 400 INVALID_COUNTRY
+Estadísticas y puntaje de tiendas
+NUEVO
+Puntaje aproximado de 0 a 100 = catálogo 30 + ventas 40 + confiabilidad 20 + actividad 10, con stars (puntaje / 20), level (new, bronze, silver, gold, platinum) y confidence. Se calcula al pedir con datos que ya existen. No son reseñas de compradores.
+
+Endpoint	Quién	Qué devuelve
+GET /stores/:id/stats	Público	{ stats }: puntaje, estrellas, nivel, confianza, desglose y contadores (ítems, pedidos, tasa de éxito, compradores). Sin dinero. Caché 60 s.
+GET /seller/stats	Vendedor	Lo mismo más sales (monto, ticket promedio, reembolsos), ordersByStatus, alerts y tips. Nunca se cachea.
+GET /stats	Público	Totales del marketplace y topStores (limit 1-20 y city). Caché 60 s.
+GET /stores MODIFICADO	Público	Cada tienda trae score, stars y level. Nuevo sort=score (mejor primero) con cursor opaco.
+Cupones
+NUEVO
+Cupones de tienda, de porcentaje o monto fijo, máximo uno por pedido, sobre el precio ya rebajado por los descuentos de ítem. Un comprador solo usa los que tiene en su cartera: asignados por el vendedor (por correo) o públicos que guarda, o que activa escribiendo su code. Restricciones: vigencia, mínimo de compra, tope, productos aplicables, usos por usuario y usos totales. Al hacer checkout el uso queda reservado y se devuelve si el pedido se cancela o vence.
+
+Endpoint	Quién	Qué hace
+GET /coupons	Comprador	Mis cupones y los públicos que puedo guardar, con state (available, used, exhausted, expired, upcoming, paused). Filtros storeId, status, limit, cursor.
+POST /coupons/:id/claim	Comprador	Guarda un cupón público. 201 nuevo, 200 si ya lo tenía.
+PUT /cart/coupon	Comprador	{ couponId } o { code }. Valida y lo pone en el carrito; devuelve { cart } con los totales. Si no aplica responde un error COUPON_* y no cambia nada.
+DELETE /cart/coupon	Comprador	Quita el cupón del carrito.
+POST /seller/coupons	Vendedor	Crea: title, type, value, code?, maxDiscountAmount?, minSubtotalAmount?, startsAt?, endsAt?, maxRedemptions?, perUserLimit?, audience?, itemIds?.
+GET /seller/coupons	Vendedor	Lista, con filtro status (active, paused, expired).
+GET /seller/coupons/:id	Vendedor	Detalle con itemIds, redeemed y walletUsers.
+PATCH /seller/coupons/:id	Vendedor	Edita. Si ya se usó, solo título, descripción, estado, vencimiento y usos totales (COUPON_IN_USE si no).
+DELETE /seller/coupons/:id	Vendedor	204. COUPON_IN_USE si hay pedidos esperando pago con él.
+POST /seller/coupons/:id/assign	Vendedor	{ emails: [...] } → { assigned, alreadyHad, notFound }. Solo cuentas de comprador.
+GET /seller/coupons/:id/redemptions	Vendedor	Usos con pedido, usuario, importe y estado (reserved o released).
+Código	HTTP	Significa
+COUPON_NOT_FOUND	404	No existe, es de otra persona o el código no es de esa tienda
+COUPON_NOT_ELIGIBLE	403	Es público: hay que guardarlo antes
+COUPON_WRONG_STORE	409	Es de otra tienda distinta a la del carrito
+COUPON_PAUSED · COUPON_NOT_STARTED · COUPON_EXPIRED	409	Pausado, aún no empieza o ya venció
+COUPON_USER_LIMIT · COUPON_EXHAUSTED	409	Ya lo usaste las veces permitidas · se agotaron los usos totales
+COUPON_MIN_NOT_MET · COUPON_NOT_APPLICABLE	409	No llega al mínimo · ningún producto del carrito entra
+Carrito y pedidos con cupón MODIFICADO
+Endpoint	Cambio
+GET /cart y los demás que devuelven el carrito	Trae coupon ({ id, code, title, type, value } o null), couponDiscountAmount y couponError (código COUPON_* si el cupón puesto ya no aplica, por ejemplo al bajar del mínimo). totalAmount ya incluye el cupón; discountAmount sigue siendo solo de ítems.
+DELETE /cart	Al vaciar el carrito también se suelta el cupón.
+POST /orders	Usa el cupón del carrito: lo bloquea, lo vuelve a validar y reserva el uso en la misma transacción. Si falla responde el error COUPON_* y no crea el pedido ni reserva stock. El cobro y la comisión usan el total ya rebajado.
+Objeto de pedido (GET /orders, /orders/:id, /seller/orders)	Nuevos couponId, couponCode y couponDiscountAmount (0 si no hubo cupón). El pedido guarda lo aplicado aunque el cupón cambie después.
+Cambio de comportamiento
+GET
+/uploads/*
+DISTINTO
+La URL es la misma y el frontend no tiene que cambiar nada, pero ahora la API entrega las imágenes desde un bucket (privado, de Railway) en vez de leerlas del disco. Aplica a fotos de ítems, banners e iconos.
+
+Respuesta 200
+Content-Type: image/webp
+Cache-Control: public, max-age=604800, immutable
+Cross-Origin-Resource-Policy: cross-origin
+Las claves llevan un UUID, así que un archivo nunca cambia: se puede cachear sin riesgo. Si no existe o la ruta es inválida: 404 NOT_FOUND.
+
+Sin cambios de contrato: los endpoints de imágenes de ítems (POST /seller/items/:id/images, PUT …/images/order, DELETE …/images/:imageId) funcionan igual que antes; solo cambió dónde se guardan los archivos. Cada ítem admite hasta 8 imágenes, así que las 3 por producto caben sin problema.
+Cómo mostrar las imágenes: concatena el host con la ruta devuelta, por ejemplo https://interledger-axiom-hackathon-production.up.railway.app + bannerUrl. El icono es un círculo con transparencia (PNG/WebP con alfa): úsalo tal cual como marcador del mapa.

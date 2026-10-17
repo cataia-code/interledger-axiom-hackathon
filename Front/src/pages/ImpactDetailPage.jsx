@@ -1,13 +1,25 @@
+import { useTranslation } from '../i18n/useTranslation';
 import { useApp } from '../context/AppContext';
-import { shops } from '../data/shops';
-import PageHeading, { SectionHeading } from '../components/ui/PageHeading';
-import SpendDonut from '../components/charts/SpendDonut';
+import { DATA_SOURCE } from '../services/api/client';
+import { useImpactStats } from '../hooks/useImpactStats';
+import { storeStatsPreviewStore } from '../data/stats';
+import PageHeading from '../components/ui/PageHeading';
 import StoreLogo from '../components/shops/StoreLogo';
-import Icon from '../components/ui/Icon';
+import StoreStatsPanel from '../components/impact/StoreStatsPanel';
+import { Button } from '../components/ui/Button';
+
 export default function ImpactDetailPage() {
-  const { navigate, openShop } = useApp();
-  return <><PageHeading eyebrow="TU HUELLA LOCAL" title="Impacto de tu viaje" description="Compras que fortalecen las comunidades que visitas." onBack={() => navigate('impact')} />
-    <div className="context-chips"><span><Icon name="pin" />Medellín, Colombia</span><span>Viaje de ejemplo</span></div><SectionHeading title="Distribución de tu gasto" /><SpendDonut />
-    <SectionHeading title="Impacto por tienda" /><div className="link-list">{shops.slice(0, 4).map((shop, index) => <button className="surface impact-shop" key={shop.id} onClick={() => openShop(shop.id)}><StoreLogo shop={shop} /><span>{shop.name}</span><b>${[40, 35, 25, 20][index]} USD</b><Icon name="chevron" /></button>)}</div>
+  const { t } = useTranslation();
+  const { navigate, shops, param, user, path } = useApp();
+  const showExample = path.split('/')[2] === 'demo';
+  const shop = shops.find(item => String(item.id) === String(param)) || ((showExample || DATA_SOURCE === 'mock') && param === storeStatsPreviewStore.id ? storeStatsPreviewStore : null);
+  const stats = useImpactStats(user?.id, shop ? [shop] : [], { demo: showExample });
+  const storeStats = stats.storeStats[String(param)];
+  if (!shop) return <><PageHeading title="Tienda no disponible" onBack={() => navigate(showExample ? 'impact/demo' : 'impact')} /><Button onClick={() => navigate(showExample ? 'impact/demo' : 'impact')}>{t('Volver al impacto')}</Button></>;
+  return <><PageHeading eyebrow={t('PUNTAJE PÚBLICO')} title={shop.name} description={shop.description} onBack={() => navigate(showExample ? 'impact/demo' : 'impact')} />
+    {stats.demo && <p className="impact-notice">{t('Vista de demostración: las cifras son ejemplos y no corresponden a datos reales.')}</p>}
+    <div className="surface impact-store-detail"><StoreLogo shop={shop} /><span>{shop.city} · {shop.currency}</span></div>
+    {stats.pending ? <div className="surface impact-status" role="status">{t('Cargando puntaje…')}</div> : storeStats ? <StoreStatsPanel stats={storeStats} /> : <div className="surface impact-status"><p>{t('El puntaje de esta tienda no está disponible todavía.')}</p><Button variant="secondary" onClick={stats.refresh}>{t('Reintentar')}</Button></div>}
+    {!stats.demo && DATA_SOURCE === 'api' && <Button className="wide space-top" variant="quiet" onClick={() => navigate(`impactDetail/${param}/demo`)}>{t('Ver ejemplo de puntaje')}</Button>}
   </>;
 }

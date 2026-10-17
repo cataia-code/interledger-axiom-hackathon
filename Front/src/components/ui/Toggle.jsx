@@ -1,3 +1,5 @@
+import { useTranslation } from '../../i18n/useTranslation';
 export default function Toggle({ label, checked, onChange }) {
-  return <button className="toggle" role="switch" aria-checked={checked} aria-label={label} onClick={() => onChange(!checked)}><span /></button>;
+  const { t } = useTranslation();
+  return <button className="toggle" role="switch" aria-checked={checked} aria-label={t(label)} onClick={() => onChange(!checked)}><span /></button>;
 }

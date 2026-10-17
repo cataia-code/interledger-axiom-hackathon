@@ -15,12 +15,19 @@ export async function createGoogleMap(container, shops, onSelect, key, signal) {
     update(visible, selected) { this.element.style.display = visible ? '' : 'none'; this.element.style.zIndex = selected ? '1000' : '1'; markSelected(this.element, selected); }
   }
   const markers = shops.map(shop => new ShopOverlay(shop));
+  let userMarker = null;
   const bounds = new maps.LatLngBounds();
   shops.forEach(shop => bounds.extend({ lat: shop.lat, lng: shop.lng }));
-  map.fitBounds(bounds, { top: 110, bottom: 160, left: 35, right: 35 });
+  if (shops.length) map.fitBounds(bounds, { top: 50, bottom: 155, left: 35, right: 35 });
   return { provider: 'Google Maps',
     update(visibleIds, selectedId) { markers.forEach(marker => marker.update(visibleIds.includes(marker.shop.id), marker.shop.id === selectedId)); },
-    center() { map.panTo({ lat: 6.2442, lng: -75.5812 }); map.setZoom(13); },
-    destroy() { markers.forEach(marker => marker.setMap(null)); maps.event.clearInstanceListeners(map); container.replaceChildren(); },
+    updateLocation(location) {
+      if (!location) { userMarker?.setMap(null); userMarker = null; return; }
+      if (!userMarker) userMarker = new maps.Marker({ map, clickable: false, zIndex: 2000, title: 'Tu ubicación', icon: { path: maps.SymbolPath.CIRCLE, scale: 9, fillColor: '#2e7d73', fillOpacity: 1, strokeColor: '#fffdf7', strokeWeight: 4 } });
+      userMarker.setPosition({ lat: location.lat, lng: location.lng });
+    },
+    centerOn(location) { map.panTo({ lat: location.lat, lng: location.lng }); map.setZoom(14); },
+    center() { if (shops.length) map.fitBounds(bounds); else { map.panTo({ lat: 6.2442, lng: -75.5812 }); map.setZoom(13); } },
+    destroy() { userMarker?.setMap(null); markers.forEach(marker => marker.setMap(null)); maps.event.clearInstanceListeners(map); container.replaceChildren(); },
   };
 }

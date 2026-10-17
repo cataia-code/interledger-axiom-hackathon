@@ -29,3 +29,22 @@
 .nav-tab.is-active .lk-icon { animation: icon-arrive .35s var(--ease); }
 @media (min-width: 650px) { body { padding: 20px 0; } .app-frame { height: calc(100dvh - 40px); min-height: 650px; border-radius: 26px; } }
 @media (max-width: 370px) { .brand-logo { width: 109px; } .app-header { padding: 0 12px; gap: 4px; } .location-button { padding: 7px; } .location-button .lk-icon:first-child { display: none; } .header-actions { gap: 4px; } .wallet-chip { padding: 7px; } }
+
+.nav-tab:not(.is-active) .lk-icon .icon-accent { fill: none; stroke: currentColor; }
+.nav-tab:not(.is-active) .lk-icon .icon-accent-line { stroke: currentColor; }
+.nav-tab:not(.is-active) .lk-icon .icon-solid { fill: currentColor; stroke: currentColor; }
+
+.header-logout { width: 38px; height: 38px; padding: 4px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; color: var(--wine); flex-shrink: 0; }
+.header-logout span { font-size: 7px; font-weight: 600; line-height: 1; white-space: nowrap; }
+.header-actions .header-logout .lk-icon { width: 17px; height: 17px; }
+@media (max-width: 340px) { .app-header .brand-logo { width: 90px; } }
+
+.header-purchases { display: flex; flex-direction: column; justify-content: center; gap: 1px; padding: 4px; flex-shrink: 0; }
+.header-purchases span { font-size: 7px; line-height: 1; font-weight: 600; }
+.header-purchases.is-active { background: #2e7d7315; border-color: var(--teal); color: var(--teal); }
+@media (max-width: 390px) { .app-header .brand-logo { width: 90px; } .header-actions { gap: 3px; } }
+@media (max-width: 340px) { .app-header { flex-wrap: wrap; flex-basis: auto; padding: 8px 12px; } .header-actions { margin-left: auto; } }
+/* Purchase history is a peer to the other circular header actions. */
+.header-purchases { display: inline-grid; place-items: center; width: 38px; height: 38px; gap: 0; padding: 8px; }
+.header-purchases span { display: none; }
+.header-purchases .lk-icon { width: 19px; height: 19px; }
