@@ -185,6 +185,12 @@ async function startOpenPayment(buyerId, o, pending, key, walletId) {
   }
 }
 
+// Número visible del pedido (ORD-…) para mostrarlo en la página de resultado.
+export async function orderNumberOf(orderId) {
+  const [row] = await db.select({ number: order.number }).from(order).where(eq(order.id, orderId));
+  return row?.number ?? null;
+}
+
 // Vuelta del navegador desde la wallet. Es pública: quien manda es el hash firmado con el nonce de la sesión, y solo un hash
 // válido cambia algo. El resultado se decide por lo que realmente se movió, no por haber vuelto al navegador.
 export async function completeOpenPayment(orderIdParam, query) {
