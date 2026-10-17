@@ -1,0 +1,25 @@
+* { box-sizing: border-box; }
+html, body, #root { min-height: 100%; margin: 0; }
+body { font-size: 13px; line-height: 1.5; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; -webkit-tap-highlight-color: transparent; }
+button:disabled { cursor: default; opacity: .55; }
+button, a, input, select { touch-action: manipulation; }
+:focus-visible { outline: 3px solid var(--teal); outline-offset: 3px; }
+h1, h2, h3, p { margin: 0; }
+h1, h2, h3 { font-family: var(--font-heading); }
+a { color: inherit; }
+img { max-width: 100%; display: block; }
+input { min-width: 0; }
+input[type=number] { appearance: textfield; -moz-appearance: textfield; }
+input::-webkit-inner-spin-button { appearance: none; }
+.surface { background: var(--paper); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
+.eyebrow { display: block; font-size: 9px; letter-spacing: 1.25px; font-weight: 700; color: var(--muted); }
+.caption { color: var(--muted); font-size: 11px; line-height: 1.6; margin: 10px 0; }
+.space-top { margin-top: 18px; }
+.wide { width: 100%; }
+.link-list { display: grid; gap: 9px; }
+.metric-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.metric-grid .metric-card { margin: 0; }
+.visually-hidden { position: absolute !important; width: 1px !important; height: 1px !important; overflow: hidden !important; clip-path: inset(50%); }
+.demo-note { color: var(--muted); font-size: 10px; text-align: center; margin-top: 14px; }
